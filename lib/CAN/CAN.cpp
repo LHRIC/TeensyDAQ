@@ -1,8 +1,9 @@
 #include <CAN.h>
+#include <Arduino.h>
 
 void canSniff(const CAN_message_t &msg) {
   //File dataFile = SD.open("0x640data.txt", FILE_WRITE);
-  /*
+  
   Serial.print("MB "); Serial.print(msg.mb);
   Serial.print("  OVERRUN: "); Serial.print(msg.flags.overrun);
   Serial.print("  LEN: "); Serial.print(msg.len);
@@ -11,7 +12,8 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print(" ID: "); Serial.print(msg.id, HEX);
   Serial.print(" Buffer: ");
   Serial.println();
-  */
+  
+  /*
   
   if(msg.id == 0x360) {
     for(int i=0; i < msg.len; i++){
@@ -24,17 +26,8 @@ void canSniff(const CAN_message_t &msg) {
     //Serial.print(msg.buf[msg.len - 2]);
     //Serial.print(",");
     //Serial.println(msg.buf[msg.len - 1]);
-    /*if (dataFile) {
-      dataFile.print(millis());
-      dataFile.print(": ");
-      dataFile.print(msg.id,HEX); 
-      dataFile.print(", "); 
-      dataFile.println(throttlePos, DEC);
-      dataFile.println(); 
-      dataFile.close();
-    }
-    */
   }
+  */
   
 }
 
