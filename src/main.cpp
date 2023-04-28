@@ -3,12 +3,16 @@
 #include <SPI.h>
 #include <SD.h>
 #include <Network.h>
+#include <ArduinoJson-v6.21.2.h>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
 const int chipSelect = BUILTIN_SDCARD;
 uint16_t throttlePos;
 
 Network network;
+
+unsigned long previousMillis = 0;
+const long interval = 100;
 
 void canSniff(const CAN_message_t &msg) {
   //File dataFile = SD.open("0x640data.txt", FILE_WRITE);
@@ -21,22 +25,6 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print(" ID: "); Serial.print(msg.id, HEX);
   Serial.print(" Buffer: ");
   Serial.println();
-  
-  /*
-  
-  if(msg.id == 0x360) {
-    for(int i=0; i < msg.len; i++){
-      Serial.print(msg.buf[i]);
-      Serial.print(", ");  
-    }
-    Serial.println();
-    uint16_t throttlePos = (msg.buf[4] << 8) | msg.buf[5];
-    Serial.println(throttlePos * 0.1); 
-    //Serial.print(msg.buf[msg.len - 2]);
-    //Serial.print(",");
-    //Serial.println(msg.buf[msg.len - 1]);
-  }
-  */
   
 }
 
@@ -72,9 +60,27 @@ void setup(void) {
   Can0.enableFIFOInterrupt();
   Can0.onReceive(canSniff);
   Can0.mailboxStatus();
+
+  const int capacity = JSON_OBJECT_SIZE(3);
+  StaticJsonDocument<capacity> doc;
+
+  doc["lat"] = 1;
+  doc["long"] = 2;
+  doc["alt"] = 3;
+
+  char output[128];
+  serializeJson(doc, output);
   
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    //Serialize data and send that bitch
+  }
+
   Can0.events();
 }
