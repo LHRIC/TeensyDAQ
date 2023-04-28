@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <Network.h>
+#include <Channel.h>
 #include <ArduinoJson-v6.21.2.h>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
@@ -13,6 +14,17 @@ Network network;
 
 unsigned long previousMillis = 0;
 const long interval = 100;
+
+Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0);
+Channel map_c = Channel(0x360, 50, 2, 3, 10, 0);
+Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0);
+Channel coolant_pres_c = Channel(0x360, 50, 6, 7, 10, -101.3);
+Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, 0);
+Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0);
+Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0);
+
+Channel canChannels[] = {rpm_c, map_c, tps_c, coolant_pres_c, coolant_temp_c, batt_voltage_c, apps_c};
+uint8_t numChannels = 7;
 
 void canSniff(const CAN_message_t &msg) {
   //File dataFile = SD.open("0x640data.txt", FILE_WRITE);
@@ -61,12 +73,11 @@ void setup(void) {
   Can0.onReceive(canSniff);
   Can0.mailboxStatus();
 
-  const int capacity = JSON_OBJECT_SIZE(3);
+  const int capacity = JSON_OBJECT_SIZE(2);
   StaticJsonDocument<capacity> doc;
 
   doc["lat"] = 1;
   doc["long"] = 2;
-  doc["alt"] = 3;
 
   char output[128];
   serializeJson(doc, output);
