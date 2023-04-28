@@ -3,7 +3,7 @@
 Channel::Channel(){};
 
 Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, uint16_t DivisorScalar, int16_t AdditiveScalar) {
-    channelId = channelId;
+    channelId = ChannelId;
     sampleRate = SampleRate;
     startBit = StartBit;
     endBit = EndBit;
@@ -18,10 +18,11 @@ uint16_t Channel::getValue( ){
     return value;
 }
 
-void Channel::setValue(uint8_t* buf) {
+void Channel::setValue(const uint8_t* buf) {
     // Assumes 16 bit Big Endian encoded data.
     // Change to a more robust system later
     value = (buf[startBit] << 8) | buf[endBit];
+    //Serial.println(value);
 }
 
 float Channel::getScaledValue() {
@@ -30,4 +31,8 @@ float Channel::getScaledValue() {
 
 void Channel::setScaledValue() {
     scaledValue = (value / divisorScalar) + additiveScalar;
+}
+
+uint16_t Channel::getChannelId() {
+    return channelId;
 }

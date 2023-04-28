@@ -7,11 +7,14 @@ class Channel {
     public:
         Channel();
         Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, uint16_t DivisorScalar, int16_t AdditiveScalar);
+        
         uint16_t getValue();
-        void setValue(uint8_t* buf);
+        void setValue(const uint8_t* buf);
 
         float getScaledValue();
         void setScaledValue();
+
+        uint16_t getChannelId();
 
 
     private:

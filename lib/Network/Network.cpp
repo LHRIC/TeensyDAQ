@@ -44,3 +44,10 @@ void Network::initializeUDP(uint16_t Port) {
     kPort = Port;
     udp.begin(kPort);
 }
+
+uint8_t Network::sendPacket(uint8_t * buf, uint16_t bufLen) {
+    uint8_t status = udp.send(Ethernet.broadcastIP(), kPort,
+            reinterpret_cast<const uint8_t *>(buf),
+            bufLen);
+    return status;
+}

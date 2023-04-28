@@ -13,7 +13,7 @@ class Network {
         uint8_t Network::startEthernet();
         void    Network::getNetworkStatus();
         void    Network::initializeUDP(uint16_t Port);
-
+        uint8_t Network::sendPacket(uint8_t * buf, uint16_t bufLen);
 
     private:
         uint16_t kPort;
