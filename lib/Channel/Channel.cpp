@@ -2,7 +2,7 @@
 
 Channel::Channel(){};
 
-Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, uint16_t DivisorScalar, int16_t AdditiveScalar) {
+Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, double DivisorScalar, double AdditiveScalar) {
     channelId = ChannelId;
     sampleRate = SampleRate;
     startBit = StartBit;
@@ -25,7 +25,7 @@ void Channel::setValue(const uint8_t* buf) {
     //Serial.println(value);
 }
 
-float Channel::getScaledValue() {
+double Channel::getScaledValue() {
     return scaledValue;
 }
 

@@ -6,12 +6,12 @@
 class Channel {
     public:
         Channel();
-        Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, uint16_t DivisorScalar, int16_t AdditiveScalar);
+        Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, double DivisorScalar, double AdditiveScalar);
         
         uint16_t getValue();
         void setValue(const uint8_t* buf);
 
-        float getScaledValue();
+        double getScaledValue();
         void setScaledValue();
 
         uint16_t getChannelId();
@@ -24,11 +24,11 @@ class Channel {
         uint8_t endBit;
         uint8_t numBytes;
 
-        uint16_t divisorScalar;
-        int16_t additiveScalar;
+        double divisorScalar;
+        double additiveScalar;
 
         uint16_t value;
-        float scaledValue;
+        double scaledValue;
 
 };
 #endif

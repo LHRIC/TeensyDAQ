@@ -19,14 +19,15 @@ Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0);
 Channel map_c = Channel(0x360, 50, 2, 3, 10, 0);
 Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0);
 Channel coolant_pres_c = Channel(0x360, 50, 6, 7, 10, -101.3);
-Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, 0);
+Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15);
 Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0);
 Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0);
 
-Channel canChannels[] = {rpm_c, map_c, tps_c, coolant_pres_c, coolant_temp_c, batt_voltage_c, apps_c};
+Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, &apps_c};
+char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps"};
 uint8_t numChannels = 7;
 
-const int capacity = JSON_OBJECT_SIZE(1);
+const int capacity = JSON_OBJECT_SIZE(25);
 StaticJsonDocument<capacity> doc;
 
 void canSniff(const CAN_message_t &msg) {
@@ -41,21 +42,22 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print(" Buffer: ");
   Serial.println();
   */
-  /*
   for(int i=0; i < numChannels; i++) {
-    if(canChannels[i].getChannelId() == msg.id) {
+    Channel curChannel = *canChannels[i];
+    if(curChannel.getChannelId() == msg.id) {
       //Serial.println("Got Here");
-      canChannels[i].setValue(msg.buf);
-      canChannels[i].setScaledValue();
+      curChannel.setValue(msg.buf);
+      curChannel.setScaledValue();
+      doc[channelNames[i]] = curChannel.getScaledValue();
     }
   }
+  /*
+  if(msg.id == 0x471) {
+    batt_voltage_c.setValue(msg.buf);
+    batt_voltage_c.setScaledValue();
+    //Serial.println(tps_c.getValue());
+  }
   */
- if(msg.id == 0x471) {
-  apps_c.setValue(msg.buf);
-  apps_c.setScaledValue();
-  //Serial.println(tps_c.getValue());
- }
-  
 }
 
 void setup(void) {
@@ -102,14 +104,17 @@ void loop() {
 
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
-
-    doc["tps"] = apps_c.getScaledValue();
-    uint8_t output[32] = {0};
+    
+    char output[128] = {0};
     serializeJson(doc, output);
     //Serialize data and send that bitch
-    if(!network.sendPacket(output, 32)){
+    //Serial.println(output);
+    
+    if(!network.sendPacket(output, 128)){
       Serial.println("Error Sending");
     }
+    
+    
   }
 
   Can0.events();
