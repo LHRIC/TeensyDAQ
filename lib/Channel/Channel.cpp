@@ -21,7 +21,11 @@ uint16_t Channel::getValue( ){
 void Channel::setValue(const uint8_t* buf) {
     // Assumes 16 bit Big Endian encoded data.
     // Change to a more robust system later
-    value = (buf[startBit] << 8) | buf[endBit];
+    if(startBit == endBit) {
+        value = buf[startBit];
+    } else {
+        value = (buf[startBit] << 8) | buf[endBit];
+    }
     //Serial.println(value);
 }
 

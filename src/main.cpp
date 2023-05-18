@@ -22,13 +22,21 @@ Channel coolant_pres_c = Channel(0x360, 50, 6, 7, 10, -101.3);
 Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15);
 Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0);
 Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0);
+Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0);
+Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0);
+Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0);
+Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0);
 
-Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, &apps_c};
-char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps"};
-uint8_t numChannels = 7;
+Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, &apps_c, &o2_c, &flat_shift_switch_c, &gear_c};
+char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps", "lambda", "flat_shift_switch", "gear"};
+uint8_t numChannels = 10;
 
-const int capacity = JSON_OBJECT_SIZE(25);
+const int capacity = JSON_OBJECT_SIZE(100);
 StaticJsonDocument<capacity> doc;
+
+const int ledPin = 13;  // the number of the LED pin
+int ledState = LOW;  // ledState used to set the LED
+
 
 void canSniff(const CAN_message_t &msg) {
   //File dataFile = SD.open("0x640data.txt", FILE_WRITE);
@@ -38,10 +46,13 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print("  LEN: "); Serial.print(msg.len);
   Serial.print(" EXT: "); Serial.print(msg.flags.extended);
   Serial.print(" TS: "); Serial.print(msg.timestamp);
-  Serial.print(" ID: "); Serial.print(msg.id, HEX);
+  */
+  //Serial.print(" ID: "); Serial.print(msg.id, HEX);Serial.println();
+  /*
   Serial.print(" Buffer: ");
   Serial.println();
   */
+ 
   for(int i=0; i < numChannels; i++) {
     Channel curChannel = *canChannels[i];
     if(curChannel.getChannelId() == msg.id) {
@@ -51,16 +62,23 @@ void canSniff(const CAN_message_t &msg) {
       doc[channelNames[i]] = curChannel.getScaledValue();
     }
   }
+  
   /*
-  if(msg.id == 0x471) {
-    batt_voltage_c.setValue(msg.buf);
-    batt_voltage_c.setScaledValue();
-    //Serial.println(tps_c.getValue());
+  if(msg.id == 0x100) {
+    for(int i=0; i<8; i++) {
+      Serial.print("AHHHHHH:< ");
+      Serial.print(msg.buf[i]);
+      Serial.print(" ");
+    }
+    Serial.println();
   }
   */
+  
 }
 
 void setup(void) {
+  pinMode(ledPin, OUTPUT);
+
   Serial.begin(9600); 
   delay(400);
   Serial.println("Hello World");
@@ -92,9 +110,15 @@ void setup(void) {
   //Can0.enableFIFOInterrupt();
   Can0.enableMBInterrupts();
   Can0.onReceive(MB0, canSniff);
+  Can0.onReceive(MB1, canSniff);
+  Can0.onReceive(MB2, canSniff);
   Can0.setMBFilter(REJECT_ALL);
-  Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471); 
+  Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
   Can0.enhanceFilter(MB0);
+  Can0.setMBFilter(MB1, 0x3E4, 0x470); 
+  Can0.enhanceFilter(MB1);
+  Can0.setMBFilter(MB2, 0x100);
+  Can0.enhanceFilter(MB2);
   Can0.mailboxStatus();
   
 }
@@ -105,12 +129,21 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     
-    char output[128] = {0};
-    serializeJson(doc, output);
+    if (ledState == LOW) {
+      ledState = HIGH;
+    } else {
+      ledState = LOW;
+    }
+
+    digitalWrite(ledPin, ledState);
+
+    char output[256] = {0};
+    
     //Serialize data and send that bitch
+    serializeJson(doc, output);
     //Serial.println(output);
     
-    if(!network.sendPacket(output, 128)){
+    if(!network.sendPacket(output, 256)){
       Serial.println("Error Sending");
     }
     
