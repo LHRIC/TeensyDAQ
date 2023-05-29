@@ -15,6 +15,7 @@ Network network;
 unsigned long previousMillis = 0;
 const long interval = 100;
 
+// Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
 Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0);
 Channel map_c = Channel(0x360, 50, 2, 3, 10, 0);
 Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0);
@@ -27,10 +28,14 @@ Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0);
 Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0);
 Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0);
 
+// Enroll channels in channel array and channel label array
+// I'm 100% sure there's a better way to do this, I was pressed for time okay.
 Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, &apps_c, &o2_c, &flat_shift_switch_c, &gear_c};
 char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps", "lambda", "flat_shift_switch", "gear"};
 uint8_t numChannels = 10;
 
+// Yet again, I know, far from the best way to serialize data, but we have the memory
+// and I am lazy.
 const int capacity = JSON_OBJECT_SIZE(100);
 StaticJsonDocument<capacity> doc;
 
@@ -53,12 +58,16 @@ void canSniff(const CAN_message_t &msg) {
   Serial.println();
   */
  
+  // Iterate through the channel array
   for(int i=0; i < numChannels; i++) {
     Channel curChannel = *canChannels[i];
+
+    // Check if the incoming message matches the selected channel.
     if(curChannel.getChannelId() == msg.id) {
-      //Serial.println("Got Here");
+      // If so, update the value and scale it appropriately.
       curChannel.setValue(msg.buf);
       curChannel.setScaledValue();
+      // Additionaly, add the scaled value to the json doc.
       doc[channelNames[i]] = curChannel.getScaledValue();
     }
   }
@@ -78,12 +87,14 @@ void canSniff(const CAN_message_t &msg) {
 
 void setup(void) {
   pinMode(ledPin, OUTPUT);
-
+  
   Serial.begin(9600); 
   delay(400);
   Serial.println("Hello World");
   //pinMode(PIN_D7, INPUT_PULLUP); 
   
+  // Configure the ethernet adaptor with a static IP, subnet mask, and default gateway
+  // Ensure that these settings are valid with the subnet configuration on the access point.
   IPAddress staticIp{192, 168, 0, 121};
   IPAddress subnetMask{255, 255, 255, 0};
   IPAddress gateway{192, 168, 0, 1};
@@ -97,21 +108,26 @@ void setup(void) {
     return;
   } else {
     Serial.println("Ethernet Started Succesfully :>");
+    // Initialize a UDP socket bound to port 5190.
     network.getNetworkStatus();
     network.initializeUDP(5190);
   }
   
   pinMode(6, OUTPUT); digitalWrite(6, LOW);
 
+  // Holy mother of god CAN configuration is a pain in the ass.
   Can0.begin();
+  // 1 million baud, ensure that this matches the ECU & Display CAN baud rate.
   Can0.setBaudRate(1000000);
+  // Max number of CAN mailboxes. 
   Can0.setMaxMB(16);
-  //Can0.enableFIFO();
-  //Can0.enableFIFOInterrupt();
+  // Do not use FIFO, use interrupt based CAN instead.
   Can0.enableMBInterrupts();
+  // Setup listeners for three mailboxes
   Can0.onReceive(MB0, canSniff);
   Can0.onReceive(MB1, canSniff);
   Can0.onReceive(MB2, canSniff);
+  // CAN filter setup, start by only accepting messages for these IDs.
   Can0.setMBFilter(REJECT_ALL);
   Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
   Can0.enhanceFilter(MB0);
@@ -119,6 +135,7 @@ void setup(void) {
   Can0.enhanceFilter(MB1);
   Can0.setMBFilter(MB2, 0x100);
   Can0.enhanceFilter(MB2);
+  
   Can0.mailboxStatus();
   
 }
