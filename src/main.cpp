@@ -1,13 +1,13 @@
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
 #include <SPI.h>
-#include <SD.h>
 #include <Network.h>
 #include <Channel.h>
 #include <ArduinoJson-v6.21.2.h>
+#include <IMU.h>
+#include <Logger.h>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
-const int chipSelect = BUILTIN_SDCARD;
 uint16_t throttlePos;
 
 Network network;
@@ -15,7 +15,10 @@ Network network;
 unsigned long previousMillis = 0;
 const long interval = 100;
 
+Logger sdCard = Logger();
+
 // Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
+// I'm so sorry for swapping between camel and snake case. It was like 3 AM.
 Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0);
 Channel map_c = Channel(0x360, 50, 2, 3, 10, 0);
 Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0);
@@ -42,6 +45,9 @@ StaticJsonDocument<capacity> doc;
 const int ledPin = 13;  // the number of the LED pin
 int ledState = LOW;  // ledState used to set the LED
 
+IMU imu = IMU();
+
+bool isRecording = false;
 
 void canSniff(const CAN_message_t &msg) {
   //File dataFile = SD.open("0x640data.txt", FILE_WRITE);
@@ -87,12 +93,16 @@ void canSniff(const CAN_message_t &msg) {
 
 void setup(void) {
   pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, HIGH);
+
+  pinMode(40, INPUT_PULLDOWN);
   
-  Serial.begin(9600); 
-  delay(400);
-  Serial.println("Hello World");
-  //pinMode(PIN_D7, INPUT_PULLUP); 
-  
+  Serial.begin(9600);
+
+
+  Serial.println("Serial Port initialized at 9600 baud");
+  uint8_t sdInitStatus = sdCard.initialize();
+  Serial.println("Initializing Network");
   // Configure the ethernet adaptor with a static IP, subnet mask, and default gateway
   // Ensure that these settings are valid with the subnet configuration on the access point.
   IPAddress staticIp{192, 168, 0, 121};
@@ -137,7 +147,11 @@ void setup(void) {
   Can0.enhanceFilter(MB2);
   
   Can0.mailboxStatus();
-  
+
+  uint8_t imuStatus = imu.init();
+
+  digitalWrite(ledPin, LOW);
+
 }
 
 void loop() {
@@ -154,6 +168,30 @@ void loop() {
 
     digitalWrite(ledPin, ledState);
 
+    // If high, start recording
+    if (digitalRead(40) && !isRecording) {
+      isRecording = true;
+      sdCard.startLogging();
+
+    } else if(!digitalRead(40) && isRecording){
+      isRecording = false;
+    }
+
+    if (isRecording) {
+      VectorInt16 accelData = imu.getAccel();
+      String s = String();
+
+      s = s + accelData.x / 4096.00f;
+      s += ", ";
+      s += accelData.y / 4096.00f;
+      s += ", ";
+      s += accelData.z / 4096.00f;
+
+      char sc[100];
+      s.toCharArray(sc, 100);
+      sdCard.println(sc);
+    }
+
     char output[256] = {0};
     
     //Serialize data and send that bitch
@@ -161,11 +199,12 @@ void loop() {
     //Serial.println(output);
     
     if(!network.sendPacket(output, 256)){
-      Serial.println("Error Sending");
+      //Serial.println("Error Sending");
     }
     
     
   }
 
+  //imu.sample();
   Can0.events();
 }
