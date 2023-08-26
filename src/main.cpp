@@ -97,7 +97,7 @@ void setup(void) {
 
   pinMode(40, INPUT_PULLDOWN);
   
-  Serial.begin(9600);
+  Serial.begin(38400);
 
 
   Serial.println("Serial Port initialized at 9600 baud");
@@ -152,6 +152,8 @@ void setup(void) {
 
   digitalWrite(ledPin, LOW);
 
+//   isRecording = 1;
+
 }
 
 void loop() {
@@ -160,32 +162,34 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     
-    if (ledState == LOW) {
-      ledState = HIGH;
-    } else {
-      ledState = LOW;
-    }
+    ledState = ledState == LOW ? HIGH : LOW;
 
     digitalWrite(ledPin, ledState);
 
     // If high, start recording
     if (digitalRead(40) && !isRecording) {
+      Serial.println("Start Recording");
       isRecording = true;
       sdCard.startLogging();
 
     } else if(!digitalRead(40) && isRecording){
+      Serial.println("Stop Recording");
       isRecording = false;
     }
 
     if (isRecording) {
       VectorInt16 accelData = imu.getAccel();
+      float* ypr = imu.getYPR();
       String s = String();
 
+      s += "a/g: ";
       s = s + accelData.x / 4096.00f;
       s += ", ";
       s += accelData.y / 4096.00f;
       s += ", ";
       s += accelData.z / 4096.00f;
+
+    Serial.println(s);
 
       char sc[100];
       s.toCharArray(sc, 100);
@@ -201,10 +205,10 @@ void loop() {
     if(!network.sendPacket(output, 256)){
       //Serial.println("Error Sending");
     }
-    
-    
   }
 
-  //imu.sample();
+//   imu.sample();
   Can0.events();
 }
+
+

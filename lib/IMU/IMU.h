@@ -9,7 +9,10 @@ class IMU {
         IMU();
 
         uint8_t IMU::init();
+        uint8_t IMU::initNoDMP();
         VectorInt16 IMU::getAccel();
+        VectorInt16 IMU::getRawAccel();
+        VectorInt16 IMU::getRawGyro();
         float* IMU::getYPR();
         void IMU::zero();
         
@@ -27,6 +30,7 @@ class IMU {
         VectorInt16 aa;         // [x, y, z]            accel sensor measurements
         VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
         VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
+        VectorInt16 aaRaw;      // [x, y, z]            raw accel sensor measurements
         VectorFloat gravity;    // [x, y, z]            gravity vector
         float euler[3];         // [psi, theta, phi]    Euler angle container
         float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
