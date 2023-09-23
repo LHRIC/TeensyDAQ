@@ -2,7 +2,8 @@
 
 Channel::Channel(){};
 
-Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, double DivisorScalar, double AdditiveScalar) {
+Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, 
+                    double DivisorScalar, double AdditiveScalar, std::string Name) {
     channelId = ChannelId;
     sampleRate = SampleRate;
     startBit = StartBit;
@@ -12,6 +13,8 @@ Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint
 
     divisorScalar = DivisorScalar;
     additiveScalar = AdditiveScalar;
+
+    name = Name;
 }
 
 uint16_t Channel::getValue( ){
@@ -39,4 +42,8 @@ void Channel::setScaledValue() {
 
 uint16_t Channel::getChannelId() {
     return channelId;
+}
+
+std::string Channel::getName() {
+    return name;
 }

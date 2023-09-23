@@ -6,6 +6,7 @@
 #include <ArduinoJson-v6.21.2.h>
 #include <IMU.h>
 #include <Logger.h>
+#include <unordered_map>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
 uint16_t throttlePos;
@@ -19,28 +20,60 @@ Logger sdCard = Logger();
 
 // Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
 // I'm so sorry for swapping between camel and snake case. It was like 3 AM.
-Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0);
-Channel map_c = Channel(0x360, 50, 2, 3, 10, 0);
-Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0);
-Channel coolant_pres_c = Channel(0x360, 50, 6, 7, 10, -101.3);
-Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15);
-Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0);
-Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0);
-Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0);
-Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0);
-Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0);
-Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0);
+Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm");
+Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map");
+Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps");
+Channel coolant_pa_c = Channel(0x360, 50, 6, 7, 10, -101.3, "coolant_pa");
+Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp");
+Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage");
+Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps");
+Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda");
+Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0, "flat_shift_switch");
+Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0, "upshift_request");
+Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0, "gear");
+Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa");
+
+// Create set of channels to look up by id
+// std::unordered_set<Channel> channelSet = {
+//   rpm_c,
+//   map_c,
+//   tps_c,
+//   coolant_pa_c,
+//   coolant_temp_c,
+//   batt_voltage_c,
+//   apps_c,
+//   o2_c,
+//   // flat_shift_switch_c,
+//   // gear_c,
+//   oil_pa_c
+// };
+
+std::unordered_map<uint16_t, Channel> channelMap = {
+  {rpm_c.getChannelId(), rpm_c},
+  {map_c.getChannelId(), map_c},
+  {tps_c.getChannelId(), tps_c},
+  {coolant_pa_c.getChannelId(), coolant_pa_c},
+  {coolant_temp_c.getChannelId(), coolant_temp_c},
+  {batt_voltage_c.getChannelId(), batt_voltage_c},
+  {apps_c.getChannelId(), apps_c},
+  {o2_c.getChannelId(), o2_c},
+  // {flat_shift_switch_c.getChannelId(), flat_shift_switch_c},
+  // {gear_c.getChannelId(), gear_c},
+  {oil_pa_c.getChannelId(), oil_pa_c}
+};
 
 // Enroll channels in channel array and channel label array
 // I'm 100% sure there's a better way to do this, I was pressed for time okay.
-Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, &apps_c, &o2_c, &flat_shift_switch_c, &gear_c};
-char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps", "lambda", "flat_shift_switch", "gear"};
-uint8_t numChannels = 10;
+// Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, 
+//                           &apps_c, &o2_c, &flat_shift_switch_c, &gear_c, &oil_pres};
+// char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps", 
+//                         "lambda", "oil_pres"};
+// uint8_t numChannels = 11;
 
 // Yet again, I know, far from the best way to serialize data, but we have the memory
 // and I am lazy.
-const int capacity = JSON_OBJECT_SIZE(100);
-StaticJsonDocument<capacity> doc;
+// const int capacity = JSON_OBJECT_SIZE();
+DynamicJsonDocument doc(2048);
 
 const int ledPin = 13;  // the number of the LED pin
 int ledState = LOW;  // ledState used to set the LED
@@ -63,20 +96,30 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print(" Buffer: ");
   Serial.println();
   */
- 
-  // Iterate through the channel array
-  for(int i=0; i < numChannels; i++) {
-    Channel curChannel = *canChannels[i];
 
-    // Check if the incoming message matches the selected channel.
-    if(curChannel.getChannelId() == msg.id) {
-      // If so, update the value and scale it appropriately.
-      curChannel.setValue(msg.buf);
-      curChannel.setScaledValue();
-      // Additionaly, add the scaled value to the json doc.
-      doc[channelNames[i]] = curChannel.getScaledValue();
-    }
+  // Find the channel that matches the incoming message.
+  Channel curChannel = channelMap[msg.id];
+  if (curChannel.getName() == "") {
+    return;
   }
+
+  curChannel.setValue(msg.buf);
+  curChannel.setScaledValue();
+  doc[curChannel.getName()] = curChannel.getScaledValue();
+  
+  // Iterate through the channel array
+  // for(int i=0; i < channel.size(); i++) {
+  //   // Channel curChannel = *canChannels[i];.
+  //   // Channel curChannel = *channelMap[channelNames[i]];
+  //   // Check if the incoming message matches the selected channel.
+  //   if(curChannel.getChannelId() == msg.id) {
+  //     // If so, update the value and scale it appropriately.
+  //     curChannel.setValue(msg.buf);
+  //     curChannel.setScaledValue();
+  //     // Additionaly, add the scaled value to the json doc.
+  //     doc[channelNames[i]] = curChannel.getScaledValue();
+  //   }
+  // }
   
   /*
   if(msg.id == 0x100) {
@@ -100,7 +143,7 @@ void setup(void) {
   Serial.begin(38400);
 
 
-  Serial.println("Serial Port initialized at 9600 baud");
+  Serial.println("Serial Port initialized at 38400 baud");
   uint8_t sdInitStatus = sdCard.initialize();
   Serial.println("Initializing Network");
   // Configure the ethernet adaptor with a static IP, subnet mask, and default gateway
@@ -133,7 +176,7 @@ void setup(void) {
   Can0.setMaxMB(16);
   // Do not use FIFO, use interrupt based CAN instead.
   Can0.enableMBInterrupts();
-  // Setup listeners for three mailboxes
+  // Setup listeners for three mailboxe
   Can0.onReceive(MB0, canSniff);
   Can0.onReceive(MB1, canSniff);
   Can0.onReceive(MB2, canSniff);
@@ -141,7 +184,7 @@ void setup(void) {
   Can0.setMBFilter(REJECT_ALL);
   Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
   Can0.enhanceFilter(MB0);
-  Can0.setMBFilter(MB1, 0x3E4, 0x470); 
+  Can0.setMBFilter(MB1, 0x3E4, 0x470, 0x361); 
   Can0.enhanceFilter(MB1);
   Can0.setMBFilter(MB2, 0x100);
   Can0.enhanceFilter(MB2);
@@ -197,10 +240,13 @@ void loop() {
     }
 
     char output[256] = {0};
+
+
     
     //Serialize data and send that bitch
     serializeJson(doc, output);
-    //Serial.println(output);
+    // serializeJson(doc, Serial);
+    Serial.println(output);
     
     if(!network.sendPacket(output, 256)){
       //Serial.println("Error Sending");
