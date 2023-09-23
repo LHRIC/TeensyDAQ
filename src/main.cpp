@@ -8,7 +8,7 @@
 #include <Logger.h>
 #include <unordered_map>
 
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0; //testing new comments
 uint16_t throttlePos;
 
 Network network;
