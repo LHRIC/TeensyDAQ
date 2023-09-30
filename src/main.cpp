@@ -211,17 +211,20 @@ void loop() {
 
     // If high, start recording
     if (digitalRead(40) && !isRecording) {
+      
+
       Serial.println("Start Recording");
       isRecording = true;
       sdCard.startLogging();
 
     } else if(!digitalRead(40) && isRecording){
+      
       Serial.println("Stop Recording");
       isRecording = false;
     }
 
     if (isRecording) {
-      VectorInt16 accelData = imu.getAccel();
+      VectorInt16 accelData = imu.getRawAccel();
       float* ypr = imu.getYPR();
       String s = String();
 

@@ -70,7 +70,7 @@ uint8_t IMU::initNoDMP() {
 
 uint8_t IMU::init(){
     Wire.begin();
-    Wire.setClock(400000);
+    // Wire.setClock(400000);
 
     mpu.initialize();
     Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
@@ -140,12 +140,12 @@ VectorInt16 IMU::getAccel(){
         mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
         mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
         
-        //Serial.print("aworld\t");
-        //Serial.print(aaWorld.x);
-        //Serial.print("\t");
-        //Serial.print(aaWorld.y);
-        //Serial.print("\t");
-        //Serial.println(aaWorld.z);
+        Serial.print("aworld\t");
+        Serial.print(aaWorld.x);
+        Serial.print("\t");
+        Serial.print(aaWorld.y);
+        Serial.print("\t");
+        Serial.println(aaWorld.z);
 
         return aaWorld;
     }
