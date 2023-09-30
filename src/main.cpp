@@ -148,13 +148,13 @@ void setup(void) {
   Serial.println("Initializing Network");
   // Configure the ethernet adaptor with a static IP, subnet mask, and default gateway
   // Ensure that these settings are valid with the subnet configuration on the access point.
-  IPAddress staticIp{192, 168, 0, 121};
-  IPAddress subnetMask{255, 255, 255, 0};
-  IPAddress gateway{192, 168, 0, 1};
+  IPAddress staticIp{192, 168, 0, 121}; // ip we are listening on
+  IPAddress subnetMask{255, 255, 255, 0}; // amount of IP's for this device or network
+  IPAddress gateway{192, 168, 0, 1}; // router ip home ip
 
   network = Network(staticIp, subnetMask, gateway);
   
-  network.registerLinkStateListener();
+  network.registerLinkStateListener(); 
   
   if(!network.startEthernet()) {
     Serial.println("Ethernet Failed to Start :<");
@@ -181,13 +181,13 @@ void setup(void) {
   Can0.onReceive(MB1, canSniff);
   Can0.onReceive(MB2, canSniff);
   // CAN filter setup, start by only accepting messages for these IDs.
-  Can0.setMBFilter(REJECT_ALL);
-  Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
-  Can0.enhanceFilter(MB0);
-  Can0.setMBFilter(MB1, 0x3E4, 0x470, 0x361); 
-  Can0.enhanceFilter(MB1);
-  Can0.setMBFilter(MB2, 0x100);
-  Can0.enhanceFilter(MB2);
+  // Can0.setMBFilter(REJECT_ALL);
+  // Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
+  // Can0.enhanceFilter(MB0);
+  // Can0.setMBFilter(MB1, 0x3E4, 0x470, 0x361); 
+  // Can0.enhanceFilter(MB1);
+  // Can0.setMBFilter(MB2, 0x100);
+  // Can0.enhanceFilter(MB2);
   
   Can0.mailboxStatus();
 
@@ -226,13 +226,18 @@ void loop() {
       String s = String();
 
       s += "a/g: ";
+      // s = s + ypr[0] ; 
+      // s = s + ypr[1];
+      // s = s + ypr[2]; 
       s = s + accelData.x / 4096.00f;
       s += ", ";
       s += accelData.y / 4096.00f;
       s += ", ";
       s += accelData.z / 4096.00f;
 
-    Serial.println(s);
+      
+
+      Serial.println(s);
 
       char sc[100];
       s.toCharArray(sc, 100);
@@ -245,6 +250,7 @@ void loop() {
     
     //Serialize data and send that bitch
     serializeJson(doc, output);
+    sdCard.println(output); 
     // serializeJson(doc, Serial);
     Serial.println(output);
     
