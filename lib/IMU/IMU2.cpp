@@ -1,4 +1,4 @@
-#include <IMU.h>
+#include <IMU2.h>
 #include "I2Cdev.h"
 #include "MPU6050.h"
 #include "MPU6050_6Axis_MotionApps20.h"
@@ -8,20 +8,20 @@
 #endif
 
 #define LED_PIN 13
-MPU6050 mpu(0x68, &Wire);
-volatile bool mpuInterrupt;
+MPU6050 mpu2(0x68, &Wire1);
+volatile bool mpuInterrupt2;
 
-void dmpDataReady(){
-    mpuInterrupt = true;
+void dmpDataReady2(){
+    mpuInterrupt2 = true;
 }
 
-IMU::IMU(){
-    dmpReady = false;
-    mpuInterrupt = false;
+IMU2::IMU2(){
+    dmpReady2 = false;
+    mpuInterrupt2 = false;
    
 };
 
-// uint8_t IMU::initNoDMP() {
+// uint8_t IMU2::initNoDMP() {
 //      // join I2C bus (I2Cdev library doesn't do this automatically)
 //     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
 //         Wire.begin();
@@ -36,11 +36,11 @@ IMU::IMU(){
 
 //     // initialize device
 //     Serial.println("Initializing I2C devices...");
-//     mpu.initialize();
+//     mpu2.initialize();
 
 //     // verify connection
 //     Serial.println("Testing device connections...");
-//     Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+//     Serial.println(mpu2.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
 //     // use the code below to change accel/gyro offset values
 //     /*
@@ -69,7 +69,7 @@ IMU::IMU(){
 //     pinMode(LED_PIN, OUTPUT);
 // }
 
-uint8_t IMU::init(TwoWire *bus){
+uint8_t IMU2::init2(TwoWire *bus){
     Serial.printf("MPU6050 with I2C bus %p initializing...", bus);
     // // These if statements dont work for some reason, HAVE NO IDEA WHY???
     // Serial.printf("SDA: %d SCL: %d\n", SDA, SCL);
@@ -85,37 +85,37 @@ uint8_t IMU::init(TwoWire *bus){
 
     // Wire.setClock(400000);
 
-    mpu.initialize();
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+    mpu2.initialize();
+    Serial.println(mpu2.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
     Serial.println(F("Initializing DMP..."));
-    devStatus = mpu.dmpInitialize();
+    devStatus2 = mpu2.dmpInitialize();
 
-    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_4);
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
+    mpu2.setFullScaleAccelRange(MPU6050_ACCEL_FS_4);
+    mpu2.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
     
 
-    if (devStatus == 0) {
+    if (devStatus2 == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
-        mpu.CalibrateAccel(6);
-        mpu.CalibrateGyro(6);
-        mpu.PrintActiveOffsets();
+        mpu2.CalibrateAccel(6);
+        mpu2.CalibrateGyro(6);
+        mpu2.PrintActiveOffsets();
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
-        mpu.setDMPEnabled(true);
+        mpu2.setDMPEnabled(true);
 
         // enable Arduino interrupt detection
         Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
         Serial.print(digitalPinToInterrupt(2));
         Serial.println(F(")..."));
-        attachInterrupt(digitalPinToInterrupt(2), dmpDataReady, RISING);
-        mpuIntStatus = mpu.getIntStatus();
+        attachInterrupt(digitalPinToInterrupt(2), dmpDataReady2, RISING);
+        mpuIntStatus2 = mpu2.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
         Serial.println(F("DMP ready! Waiting for first interrupt..."));
-        dmpReady = true;
+        dmpReady2 = true;
 
         // get expected DMP packet size for later comparison
-        packetSize = mpu.dmpGetFIFOPacketSize();
+        packetSize2 = mpu2.dmpGetFIFOPacketSize();
 
         return 0;
     } else {
@@ -124,21 +124,21 @@ uint8_t IMU::init(TwoWire *bus){
         // 2 = DMP configuration updates failed
         // (if it's going to break, usually the code will be 1)
         Serial.print(F("DMP Initialization failed (code "));
-        Serial.print(devStatus);
+        Serial.print(devStatus2);
         Serial.println(F(")"));
-        return devStatus;
+        return devStatus2;
     }
 };
 
-VectorInt16 IMU::getAccel(){
-    if (!dmpReady) return;
+VectorInt16 IMU2::getAccel2(){
+    if (!dmpReady2) return;
     // read a packet from FIFO
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
+    if (mpu2.dmpGetCurrentFIFOPacket(fifoBuffer2)) { // Get the Latest packet 
         // display Euler angles in degrees
         /*
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        mpu2.dmpGetQuaternion(&q, fifoBuffer);
+        mpu2.dmpGetGravity(&gravity, &q);
+        mpu2.dmpGetYawPitchRoll(ypr, &q, &gravity);
         Serial.print("ypr\t");
         Serial.print(ypr[0] * 180/M_PI);
         Serial.print("\t");
@@ -147,11 +147,11 @@ VectorInt16 IMU::getAccel(){
         Serial.println(ypr[2] * 180/M_PI);
         */
 
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetAccel(&aa, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-        mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+        mpu2.dmpGetQuaternion(&q2, fifoBuffer2);
+        mpu2.dmpGetAccel(&aa2, fifoBuffer2);
+        mpu2.dmpGetGravity(&gravity2, &q2);
+        mpu2.dmpGetLinearAccel(&aaReal2, &aa2, &gravity2);
+        mpu2.dmpGetLinearAccelInWorld(&aaWorld2, &aaReal2, &q2);
         
         // Serial.print("aworld\t");
         // Serial.print(aaWorld.x);
@@ -160,43 +160,43 @@ VectorInt16 IMU::getAccel(){
         // Serial.print("\t");
         // Serial.println(aaWorld.z);
 
-        return aaReal;
+        return aaReal2;
     }
 };
 
-VectorInt16 IMU::getRawAccel() {   
+VectorInt16 IMU2::getRawAccel2() {   
     // if(!dmpReady) return;
 
-    mpu.getAcceleration(&aaRaw.x, &aaRaw.y, &aaRaw.z);
+    mpu2.getAcceleration(&aaRaw2.x, &aaRaw2.y, &aaRaw2.z);
 
-    return aaRaw;
+    return aaRaw2;
 }
 
-VectorInt16 IMU::getRawGyro() {
+VectorInt16 IMU2::getRawGyro2() {
     VectorInt16 gyro;
 
-    mpu.getRotation(&gyro.x, &gyro.y, &gyro.z);
+    mpu2.getRotation(&gyro.x, &gyro.y, &gyro.z);
 
     return gyro;
 }
 
-float* IMU::getYPR(){
-    if (!dmpReady) return;
+float* IMU2::getYPR2(){
+    if (!dmpReady2) return;
     // read a packet from FIFO
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
+    if (mpu2.dmpGetCurrentFIFOPacket(fifoBuffer2)) { // Get the Latest packet 
         // display Euler angles in degrees
         
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+        mpu2.dmpGetQuaternion(&q2, fifoBuffer2);
+        mpu2.dmpGetGravity(&gravity2, &q2);
+        mpu2.dmpGetYawPitchRoll(ypr2, &q2, &gravity2);
         Serial.print("ypr\t");
-        Serial.print(ypr[0] * 180/M_PI);
+        Serial.print(ypr2[0] * 180/M_PI);
         Serial.print("\t");
-        Serial.print(ypr[1] * 180/M_PI);
+        Serial.print(ypr2[1] * 180/M_PI);
         Serial.print("\t");
-        Serial.println(ypr[2] * 180/M_PI);
+        Serial.println(ypr2[2] * 180/M_PI);
 
-        return ypr;
+        return ypr2;
     }
 }
 
@@ -204,8 +204,8 @@ float* IMU::getYPR(){
 
 
 
-void IMU::zero(){
-    mpu.CalibrateAccel(6);
-    mpu.CalibrateGyro(6);
-    mpu.PrintActiveOffsets();
+void IMU2::zero2(){
+    mpu2.CalibrateAccel(6);
+    mpu2.CalibrateGyro(6);
+    mpu2.PrintActiveOffsets();
 }

@@ -5,6 +5,7 @@
 #include <Channel.h>
 #include <ArduinoJson-v6.21.2.h>
 #include <IMU.h>
+#include <IMU2.h>
 #include <Logger.h>
 #include <unordered_map>
 
@@ -78,7 +79,8 @@ DynamicJsonDocument doc(2048);
 const int ledPin = 13;  // the number of the LED pin
 int ledState = LOW;  // ledState used to set the LED
 
-IMU imu = IMU();
+IMU uprightImu = IMU();
+IMU2 cgImu = IMU2();
 
 bool isRecording = false;
 
@@ -138,6 +140,9 @@ void setup(void) {
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, HIGH);
 
+  Wire.begin();
+  Wire1.begin();
+
   pinMode(40, INPUT_PULLDOWN);
   
   Serial.begin(38400);
@@ -191,7 +196,9 @@ void setup(void) {
   
   Can0.mailboxStatus();
 
-  uint8_t imuStatus = imu.init();
+  // parameters are the SDA and SCL pins on the teensy
+  uint8_t uprightImuStatus = uprightImu.init(&Wire);
+  uint8_t cgImuStatus = cgImu.init2(&Wire1);
 
   digitalWrite(ledPin, LOW);
 
@@ -224,27 +231,38 @@ void loop() {
     }
 
     if (isRecording) {
-      VectorInt16 accelData = imu.getRawAccel();
-      float* ypr = imu.getYPR();
+      VectorInt16 uprightAccelData = uprightImu.getAccel();
+      VectorInt16 cgAccelData = cgImu.getAccel2();
+      // float* ypr = imu.getYPR();
       String s = String();
 
-      s += "a/g: ";
+      // s += "a/cg_a: ";
       // s = s + ypr[0] ; 
       // s = s + ypr[1];
       // s = s + ypr[2]; 
-      s = s + accelData.x / 4096.00f;
+      s = s + uprightAccelData.x / 4096.00f;
       s += ", ";
-      s += accelData.y / 4096.00f;
+      s += uprightAccelData.y / 4096.00f;
       s += ", ";
-      s += accelData.z / 4096.00f;
+      s += uprightAccelData.z / 4096.00f;
+      s += "/";
+      s += cgAccelData.x / 4096.00f;
+      s += ", ";
+      s += cgAccelData.y / 4096.00f;
+      s += ", ";
+      s += cgAccelData.z / 4096.00f;
+      doc["upright_accel_x"] = uprightAccelData.x / 4096.00f;
+      doc["upright_accel_y"] = uprightAccelData.y / 4096.00f;
+      doc["upright_accel_z"] = uprightAccelData.z / 4096.00f;
+      doc["cg_accel_x"] = cgAccelData.x / 4096.00f;
+      doc["cg_accel_y"] = cgAccelData.y / 4096.00f;
+      doc["cg_accel_z"] = cgAccelData.z / 4096.00f;
 
-      
+      // Serial.println(s);
 
-      Serial.println(s);
-
-      char sc[100];
-      s.toCharArray(sc, 100);
-      sdCard.println(sc);
+      // char sc[100];
+      // s.toCharArray(sc, 100);
+      // sdCard.println(sc);
     }
 
     char output[256] = {0};

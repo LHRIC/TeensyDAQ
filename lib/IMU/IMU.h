@@ -8,7 +8,7 @@ class IMU {
     public:
         IMU();
 
-        uint8_t IMU::init();
+        uint8_t IMU::init(TwoWire *Wire);
         uint8_t IMU::initNoDMP();
         VectorInt16 IMU::getAccel();
         VectorInt16 IMU::getRawAccel();
