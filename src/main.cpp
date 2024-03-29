@@ -253,7 +253,7 @@ void loop() {
       {
         Channel curChannel = it->second;
         sensorMessage.set_timestamp(currentMillis);
-        sensorMessage.set_can_id(curChannel.getChannelId());
+        sensorMessage.set_canId(curChannel.getChannelId());
         // convert value to 8 bytes
         for (int i = 0; i < 8; i++)
         {

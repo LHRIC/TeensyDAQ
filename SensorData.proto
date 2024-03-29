@@ -4,6 +4,6 @@ package sensor_data;
 
 message SensorMessage {
   uint64 timestamp = 1;   // Timestamp in Unix epoch time (milliseconds)
-  uint32 can_id = 2 ;     // CAN ID
+  uint32 canId = 2 ;     // CAN ID
   bytes data = 3;         // 8 bytes of data
 }

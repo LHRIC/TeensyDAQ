@@ -33,14 +33,14 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
     SensorMessage(const SensorMessage& rhs )
     {
       set_timestamp(rhs.get_timestamp());
-      set_can_id(rhs.get_can_id());
+      set_canId(rhs.get_canId());
       set_data(rhs.get_data());
     }
 
     SensorMessage(const SensorMessage&& rhs ) noexcept
     {
       set_timestamp(rhs.get_timestamp());
-      set_can_id(rhs.get_can_id());
+      set_canId(rhs.get_canId());
       set_data(rhs.get_data());
     }
 
@@ -50,14 +50,14 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
     {
       NOT_SET = 0,
       TIMESTAMP = 1,
-      CAN_ID = 2,
+      CANID = 2,
       DATA = 3
     };
 
     SensorMessage& operator=(const SensorMessage& rhs)
     {
       set_timestamp(rhs.get_timestamp());
-      set_can_id(rhs.get_can_id());
+      set_canId(rhs.get_canId());
       set_data(rhs.get_data());
       return *this;
     }
@@ -65,7 +65,7 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
     SensorMessage& operator=(const SensorMessage&& rhs) noexcept
     {
       set_timestamp(rhs.get_timestamp());
-      set_can_id(rhs.get_can_id());
+      set_canId(rhs.get_canId());
       set_data(rhs.get_data());
       return *this;
     }
@@ -78,13 +78,13 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
     inline const uint64_t& get_timestamp() const { return timestamp_.get(); }
     inline uint64_t timestamp() const { return timestamp_.get(); }
 
-    static constexpr char const* CAN_ID_NAME = "can_id";
-    inline void clear_can_id() { can_id_.clear(); }
-    inline void set_can_id(const uint32_t& value) { can_id_ = value; }
-    inline void set_can_id(const uint32_t&& value) { can_id_ = value; }
-    inline uint32_t& mutable_can_id() { return can_id_.get(); }
-    inline const uint32_t& get_can_id() const { return can_id_.get(); }
-    inline uint32_t can_id() const { return can_id_.get(); }
+    static constexpr char const* CANID_NAME = "canId";
+    inline void clear_canId() { canId_.clear(); }
+    inline void set_canId(const uint32_t& value) { canId_ = value; }
+    inline void set_canId(const uint32_t&& value) { canId_ = value; }
+    inline uint32_t& mutable_canId() { return canId_.get(); }
+    inline const uint32_t& get_canId() const { return canId_.get(); }
+    inline uint32_t canId() const { return canId_.get(); }
 
     static constexpr char const* DATA_NAME = "data";
     inline void clear_data() { data_.clear(); }
@@ -103,9 +103,9 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
         return_value = timestamp_.serialize_with_id(static_cast<uint32_t>(FieldNumber::TIMESTAMP), buffer, false);
       }
 
-      if((0U != can_id_.get()) && (::EmbeddedProto::Error::NO_ERRORS == return_value))
+      if((0U != canId_.get()) && (::EmbeddedProto::Error::NO_ERRORS == return_value))
       {
-        return_value = can_id_.serialize_with_id(static_cast<uint32_t>(FieldNumber::CAN_ID), buffer, false);
+        return_value = canId_.serialize_with_id(static_cast<uint32_t>(FieldNumber::CANID), buffer, false);
       }
 
       if(::EmbeddedProto::Error::NO_ERRORS == return_value)
@@ -133,8 +133,8 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
             return_value = timestamp_.deserialize_check_type(buffer, wire_type);
             break;
 
-          case FieldNumber::CAN_ID:
-            return_value = can_id_.deserialize_check_type(buffer, wire_type);
+          case FieldNumber::CANID:
+            return_value = canId_.deserialize_check_type(buffer, wire_type);
             break;
 
           case FieldNumber::DATA:
@@ -171,7 +171,7 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
     void clear() override
     {
       clear_timestamp();
-      clear_can_id();
+      clear_canId();
       clear_data();
 
     }
@@ -184,8 +184,8 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
         case FieldNumber::TIMESTAMP:
           name = TIMESTAMP_NAME;
           break;
-        case FieldNumber::CAN_ID:
-          name = CAN_ID_NAME;
+        case FieldNumber::CANID:
+          name = CANID_NAME;
           break;
         case FieldNumber::DATA:
           name = DATA_NAME;
@@ -251,7 +251,7 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
       }
 
       left_chars = timestamp_.to_string(left_chars, indent_level + 2, TIMESTAMP_NAME, true);
-      left_chars = can_id_.to_string(left_chars, indent_level + 2, CAN_ID_NAME, false);
+      left_chars = canId_.to_string(left_chars, indent_level + 2, CANID_NAME, false);
       left_chars = data_.to_string(left_chars, indent_level + 2, DATA_NAME, false);
   
       if( 0 == indent_level) 
@@ -278,7 +278,7 @@ class SensorMessage final: public ::EmbeddedProto::MessageInterface
 
 
       EmbeddedProto::uint64 timestamp_ = 0U;
-      EmbeddedProto::uint32 can_id_ = 0U;
+      EmbeddedProto::uint32 canId_ = 0U;
       ::EmbeddedProto::FieldBytes<SensorMessage_data_LENGTH> data_;
 
 };

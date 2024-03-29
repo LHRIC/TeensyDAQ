@@ -10,7 +10,8 @@
       "string": "cpp",
       "vector": "cpp",
       "system_error": "cpp",
-      "array": "cpp"
+      "array": "cpp",
+      "limits": "cpp"
     },
     "cmake.configureOnOpen": false,
     "cmake.sourceDirectory": "C:/Users/Samrut Gadde/Documents/TeensyDAQ/.pio/libdeps/teensy41/Unity"
