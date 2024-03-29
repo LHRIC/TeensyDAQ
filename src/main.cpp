@@ -8,10 +8,10 @@
 #include <IMU2.h>
 #include <Logger.h>
 #include <unordered_map>
+#include <SensorData.h>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0; //testing new comments
 uint16_t throttlePos;
-
 Network network;
 
 unsigned long previousMillis = 0;
@@ -33,6 +33,7 @@ Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0, "flat_shift_switch")
 Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0, "upshift_request");
 Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0, "gear");
 Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa");
+Channel test_c = Channel(0x1, 50, 0, 1, 0, 0, "test");
 
 // Create set of channels to look up by id
 // std::unordered_set<Channel> channelSet = {
@@ -60,21 +61,12 @@ std::unordered_map<uint16_t, Channel> channelMap = {
   {o2_c.getChannelId(), o2_c},
   // {flat_shift_switch_c.getChannelId(), flat_shift_switch_c},
   // {gear_c.getChannelId(), gear_c},
-  {oil_pa_c.getChannelId(), oil_pa_c}
+  {oil_pa_c.getChannelId(), oil_pa_c},
+  {test_c.getChannelId(), test_c}
 };
 
-// Enroll channels in channel array and channel label array
-// I'm 100% sure there's a better way to do this, I was pressed for time okay.
-// Channel* canChannels[] = {&rpm_c, &map_c, &tps_c, &coolant_pres_c, &coolant_temp_c, &batt_voltage_c, 
-//                           &apps_c, &o2_c, &flat_shift_switch_c, &gear_c, &oil_pres};
-// char* channelNames[] = {"rpm", "map", "tps", "coolant_pres", "coolant_temp", "batt_voltage", "apps", 
-//                         "lambda", "oil_pres"};
-// uint8_t numChannels = 11;
-
-// Yet again, I know, far from the best way to serialize data, but we have the memory
-// and I am lazy.
-// const int capacity = JSON_OBJECT_SIZE();
 DynamicJsonDocument doc(2048);
+sensor_data::SensorMessage<100> sensorMessage;
 
 const int ledPin = 13;  // the number of the LED pin
 int ledState = LOW;  // ledState used to set the LED
@@ -93,7 +85,7 @@ void canSniff(const CAN_message_t &msg) {
   Serial.print(" EXT: "); Serial.print(msg.flags.extended);
   Serial.print(" TS: "); Serial.print(msg.timestamp);
   */
-  //Serial.print(" ID: "); Serial.print(msg.id, HEX);Serial.println();
+  // Serial.print(" ID: "); Serial.print(msg.id, HEX);Serial.println();
   /*
   Serial.print(" Buffer: ");
   Serial.println();
@@ -123,17 +115,14 @@ void canSniff(const CAN_message_t &msg) {
   //   }
   // }
   
-  /*
-  if(msg.id == 0x100) {
+  if(msg.id == 0x1) {
     for(int i=0; i<8; i++) {
       Serial.print("AHHHHHH:< ");
       Serial.print(msg.buf[i]);
       Serial.print(" ");
     }
     Serial.println();
-  }
-  */
-  
+  }  
 }
 
 void setup(void) {
@@ -145,7 +134,7 @@ void setup(void) {
 
   pinMode(40, INPUT_PULLDOWN);
   
-  Serial.begin(38400);
+  Serial.begin(9600);
 
 
   Serial.println("Serial Port initialized at 38400 baud");
@@ -176,7 +165,7 @@ void setup(void) {
   // Holy mother of god CAN configuration is a pain in the ass.
   Can0.begin();
   // 1 million baud, ensure that this matches the ECU & Display CAN baud rate.
-  Can0.setBaudRate(1000000);
+  Can0.setBaudRate(1E6);
   // Max number of CAN mailboxes. 
   Can0.setMaxMB(16);
   // Do not use FIFO, use interrupt based CAN instead.
@@ -185,6 +174,8 @@ void setup(void) {
   Can0.onReceive(MB0, canSniff);
   Can0.onReceive(MB1, canSniff);
   Can0.onReceive(MB2, canSniff);
+
+  
   // CAN filter setup, start by only accepting messages for these IDs.
   // Can0.setMBFilter(REJECT_ALL);
   // Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368); 
@@ -258,11 +249,25 @@ void loop() {
       doc["cg_accel_y"] = cgAccelData.y / 4096.00f;
       doc["cg_accel_z"] = cgAccelData.z / 4096.00f;
 
+      for (auto it = channelMap.begin(); it != channelMap.end(); it++)
+      {
+        Channel curChannel = it->second;
+        sensorMessage.set_timestamp(currentMillis);
+        sensorMessage.set_can_id(curChannel.getChannelId());
+        // convert value to 8 bytes
+        for (int i = 0; i < 8; i++)
+        {
+          sensorMessage.mutable_data()[i] = curChannel.getValue() >> (i * 8);
+        }
+      }
+      
       // Serial.println(s);
 
-      // char sc[100];
+      // char sc[100];  `1``Z
       // s.toCharArray(sc, 100);
       // sdCard.println(sc);
+
+
     }
 
     char output[256] = {0};
@@ -274,6 +279,9 @@ void loop() {
     sdCard.println(output); 
     // serializeJson(doc, Serial);
     Serial.println(output);
+
+    // Package into SensorMessage
+
     
     if(!network.sendPacket(output, 256)){
       //Serial.println("Error Sending");

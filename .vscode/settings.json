@@ -1,11 +1,16 @@
 {
     "files.associations": {
-        "*.tpp": "cpp",
-        "*.tcc": "cpp",
-        "unordered_map": "cpp",
-        "istream": "cpp",
-        "numeric": "cpp",
-        "ostream": "cpp"
+      "*.tpp": "cpp",
+      "*.tcc": "cpp",
+      "unordered_map": "cpp",
+      "istream": "cpp",
+      "numeric": "cpp",
+      "ostream": "cpp",
+      "deque": "cpp",
+      "string": "cpp",
+      "vector": "cpp",
+      "system_error": "cpp",
+      "array": "cpp"
     },
     "cmake.configureOnOpen": false,
     "cmake.sourceDirectory": "C:/Users/Samrut Gadde/Documents/TeensyDAQ/.pio/libdeps/teensy41/Unity"
