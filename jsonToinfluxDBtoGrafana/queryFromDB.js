@@ -2,7 +2,7 @@ const { InfluxDB, Point } = require('@influxdata/influxdb-client');
 
 /** Environment variables **/
 const url = 'http://localhost:8086'
-const token = "XhIcTsxmz1IpLlsA6PAP-DnCGmJJTi3ox8zBEXyoEjS8zfKOCmqoDsO7bWOaNIl6kFPM8o2mX6wwADGT_Zya_A=="
+const token = "add your api key"
 let org = `me`
 let bucket = `telem2024vip`
 
