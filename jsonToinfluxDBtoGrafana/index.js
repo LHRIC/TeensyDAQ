@@ -4,7 +4,7 @@ const { InfluxDB, Point } = require('@influxdata/influxdb-client');
 
 /** Environment variables **/
 const url = 'http://localhost:8086'
-const token = "XhIcTsxmz1IpLlsA6PAP-DnCGmJJTi3ox8zBEXyoEjS8zfKOCmqoDsO7bWOaNIl6kFPM8o2mX6wwADGT_Zya_A=="
+const token = "add your api key"
 let org = `me`
 let bucket = `telem2024vip`
 
@@ -71,8 +71,7 @@ writeApi.close().then(() => {
 // ------------------grafana details------------------
 // grafana login username: admin, password: admin (localhost:3000)
 // brew services start/stop grafana
-// grafana api token: 2YbjJgNOwIxCerSPtooVHUGwaxZInsqiWZay0ehi4ZZwsqaB4Og29uIWAVRSb9ulDH3SfbmkuOei94qJfIVj-A==
-// influxdb token: XhIcTsxmz1IpLlsA6PAP-DnCGmJJTi3ox8zBEXyoEjS8zfKOCmqoDsO7bWOaNIl6kFPM8o2mX6wwADGT_Zya_A==
+
 // influxdb org: me
 // influxdb bucket: telem2024vip
 // influxdb url: http://localhost:8086
