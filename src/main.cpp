@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <SensorData.h>
 
+#include <ryml_all.hpp>
+
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0; //testing new comments
 uint16_t throttlePos;
 Network network;
@@ -19,51 +21,92 @@ const long interval = 100;
 
 Logger sdCard = Logger();
 
-// Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
-// I'm so sorry for swapping between camel and snake case. It was like 3 AM.
-Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm");
-Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map");
-Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps");
-Channel coolant_pa_c = Channel(0x360, 50, 6, 7, 10, -101.3, "coolant_pa");
-Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp");
-Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage");
-Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps");
-Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda");
-Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0, "flat_shift_switch");
-Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0, "upshift_request");
-Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0, "gear");
-Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa");
-Channel test_c = Channel(0x1, 50, 0, 1, 0, 0, "test");
+// -----------------------------------------------------
 
-// Create set of channels to look up by id
-// std::unordered_set<Channel> channelSet = {
-//   rpm_c,
-//   map_c,
-//   tps_c,
-//   coolant_pa_c,
-//   coolant_temp_c,
-//   batt_voltage_c,
-//   apps_c,
-//   o2_c,
-//   // flat_shift_switch_c,
-//   // gear_c,
-//   oil_pa_c
+std::unordered_map<uint16_t, Channel> channelMap;
+// parse and load channels from a YAML file
+void loadChannels(std::string filePath) {
+    // open the file
+    File file = SD.open(filePath, FILE_READ);
+    if (!file) {
+        Serial.println("Failed to open YAML file!");
+        return;
+    }
+
+    // read the entire file content into a string
+    std::string yaml_content;
+    while (file.available()) {
+        yaml_content += (char)file.read();
+    }
+    file.close();
+
+    // parse the YAML string
+    ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml_content));
+
+    // traverse over each element in string
+    for (ryml::NodeRef node : tree.rootref().children()) {
+        int channelId = node["ChannelId"].val<int>();
+        int sampleRate = node["SampleRate"].val<int>();
+        int startBit = node["StartBit"].val<int>();
+        int endBit = node["EndBit"].val<int>();
+        double divisorScalar = node["DivisorScalar"].val<double>();
+        double additiveScalar = node["AdditiveScalar"].val<double>();
+        std::string name = node["Name"].val<std::string>();
+
+        // add new channel to  map
+        Channel channel(channelId, sampleRate, startBit, endBit, divisorScalar, additiveScalar, name);
+        channelMap[channelId] = channel;
+    }
+}
+
+
+// // Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
+// // I'm so sorry for swapping between camel and snake case. It was like 3 AM.
+// Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm");
+// Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map");
+// Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps");
+// Channel coolant_pa_c = Channel(0x360, 50, 6, 7, 10, -101.3, "coolant_pa");
+// Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp");
+// Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage");
+// Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps");
+// Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda");
+// Channel flat_shift_switch_c = Channel(0x3E4, 5, 2, 3, 1, 0, "flat_shift_switch");
+// Channel upshift_request_c = Channel(0x100, 0, 0, 1, 1, 0, "upshift_request");
+// Channel gear_c = Channel(0x470, 20, 7, 7, 1, 0, "gear");
+// Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa");
+// Channel test_c = Channel(0x1, 50, 0, 1, 0, 0, "test");
+
+// // Create set of channels to look up by id
+// // std::unordered_set<Channel> channelSet = {
+// //   rpm_c,
+// //   map_c,
+// //   tps_c,
+// //   coolant_pa_c,
+// //   coolant_temp_c,
+// //   batt_voltage_c,
+// //   apps_c,
+// //   o2_c,
+// //   // flat_shift_switch_c,
+// //   // gear_c,
+// //   oil_pa_c
+// // };
+
+// std::unordered_map<uint16_t, Channel> channelMap = {
+//   {rpm_c.getChannelId(), rpm_c},
+//   {map_c.getChannelId(), map_c},
+//   {tps_c.getChannelId(), tps_c},
+//   {coolant_pa_c.getChannelId(), coolant_pa_c},
+//   {coolant_temp_c.getChannelId(), coolant_temp_c},
+//   {batt_voltage_c.getChannelId(), batt_voltage_c},
+//   {apps_c.getChannelId(), apps_c},
+//   {o2_c.getChannelId(), o2_c},
+//   // {flat_shift_switch_c.getChannelId(), flat_shift_switch_c},
+//   // {gear_c.getChannelId(), gear_c},
+//   {oil_pa_c.getChannelId(), oil_pa_c},
+//   {test_c.getChannelId(), test_c}
 // };
 
-std::unordered_map<uint16_t, Channel> channelMap = {
-  {rpm_c.getChannelId(), rpm_c},
-  {map_c.getChannelId(), map_c},
-  {tps_c.getChannelId(), tps_c},
-  {coolant_pa_c.getChannelId(), coolant_pa_c},
-  {coolant_temp_c.getChannelId(), coolant_temp_c},
-  {batt_voltage_c.getChannelId(), batt_voltage_c},
-  {apps_c.getChannelId(), apps_c},
-  {o2_c.getChannelId(), o2_c},
-  // {flat_shift_switch_c.getChannelId(), flat_shift_switch_c},
-  // {gear_c.getChannelId(), gear_c},
-  {oil_pa_c.getChannelId(), oil_pa_c},
-  {test_c.getChannelId(), test_c}
-};
+// -----------------------------------------------------
 
 DynamicJsonDocument doc(2048);
 sensor_data::SensorMessage<100> sensorMessage;
