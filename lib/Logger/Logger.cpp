@@ -7,7 +7,6 @@ Logger::Logger(){
 
 }
 
-
 uint8_t Logger::initialize(){
     Serial.println("Initializing SD card...");
     if (!SD.begin(chipSelect)) {
@@ -19,13 +18,11 @@ uint8_t Logger::initialize(){
 }
 
 void Logger::startLogging(){
-    filename[0] = '\0';
-    itoa(millis(), filename, 10);
+    // filename[0] = '\0';
+    // itoa(millis(), filename, 10);
     Serial.println("Filename is:");
     Serial.println(filename);
 }
-
-
 
 void Logger::openFile(){
     activeFile = SD.open(filename, FILE_WRITE);
@@ -40,4 +37,12 @@ void Logger::println(char* line){
     activeFile.print(String(millis(), DEC) + ": ");
     activeFile.println(line);
     closeFile();
+}
+
+void Logger::getFilename(){
+    Serial.println(filename);
+}
+
+void Logger::setFilename(char* name){
+    strcpy(filename, name);
 }

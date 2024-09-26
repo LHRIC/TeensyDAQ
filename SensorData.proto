@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package sensor_data;
-
-message SensorMessage {
-  uint64 timestamp = 1;   // Timestamp in Unix epoch time (milliseconds)
-  uint32 canId = 2 ;     // CAN ID
-  bytes data = 3;         // 8 bytes of data
-}
