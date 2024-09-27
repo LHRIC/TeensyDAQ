@@ -32,7 +32,20 @@ void Logger::closeFile(){
     activeFile.close();
 }
 
-void Logger::println(char* line){
+/**
+ * @brief Print a line to the active file
+ * @param line The line to print
+ * @param sec second timestamp
+ * @param us microsecond timestamp
+ */
+void Logger::println(char* line, uint32_t sec, uint32_t us) {
+    openFile();
+    activeFile.print(String(sec, DEC) + ", " + String(us, DEC) + ": ");
+    activeFile.println(line);
+    closeFile();
+}
+
+void Logger::println(char* line) {
     openFile();
     activeFile.print(String(millis(), DEC) + ": ");
     activeFile.println(line);

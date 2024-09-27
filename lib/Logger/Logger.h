@@ -11,6 +11,7 @@ class Logger {
         uint8_t Logger::initialize();
         void Logger::startLogging();
         void Logger::println(char* line);
+        void Logger::println(char* line, uint32_t sec, uint32_t us);
         void Logger::getFilename();
         void Logger::setFilename(char* name);
     private:

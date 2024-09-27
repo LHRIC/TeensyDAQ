@@ -14,6 +14,7 @@ unsigned long previousMillis = 0;
 const long interval = 100;
 int ticker = 0;
 int ZIGBEE_UART_BAUDRATE = 115200;
+int CHANNEL_PARAMETERS = 7;
 
 Logger sdCard = Logger();
 
@@ -191,6 +192,46 @@ void setup(void)
 
     sdCard.setFilename((char *)filename.c_str());
     sdCard.startLogging();
+
+    // Get MessageDefinitions.csv from the SD card
+    File file = SD.open("MessageDefinitions.csv", FILE_READ);
+
+    if (file)
+    {
+      Serial.println("MessageDefinitions.csv:");
+      // Read line by line
+      while (file.available())
+      {
+        String line = file.readStringUntil('\n');
+
+        // Split line by comma
+        String tokens[CHANNEL_PARAMETERS];
+        int i = 0;
+        int pos = 0;
+        while (line.indexOf(',') != -1)
+        {
+          pos = line.indexOf(',');
+          tokens[i] = line.substring(0, pos);
+          line = line.substring(pos + 1);
+          i++;
+        }
+
+        // Add channel to map
+        Channel newChannel = Channel(tokens[0].toInt(),
+                                     tokens[1].toInt(), tokens[2].toInt(),
+                                     tokens[3].toInt(), tokens[4].toInt(),
+                                     tokens[5].toInt(), tokens[6].c_str());
+
+        channelMap[newChannel.getChannelId()] = newChannel;
+
+        Serial.println(line);
+      }
+      file.close();
+    }
+    else
+    {
+      Serial.println("Failed to open MessageDefinitions.csv");
+    }
   }
   else
   {
@@ -244,19 +285,34 @@ void loop()
 
     digitalWrite(ledPin, ledState);
 
+    int32_t lat;
+    int32_t lon;
+    int32_t alt;
+    uint32_t epoch;
+    uint32_t microseconds;
+
     // Read GPS data
-    if (myGNSS.getPVT() == true)
+    if (myGNSS.getNAVHPPOSECEF() == true)
     {
-      int32_t lat = myGNSS.getLatitude();
-      int32_t lon = myGNSS.getLongitude();
-      int32_t alt = myGNSS.getAltitude();
-      uint32_t microseconds;
-      int32_t time = myGNSS.getUnixEpoch(microseconds);
+      // First, let's collect the position data
+      int32_t lat = myGNSS.getHighResECEFX();
+      int8_t lat_hp = myGNSS.getHighResECEFXHp();
+      int32_t lon = myGNSS.getHighResECEFY();
+      int8_t lon_hp = myGNSS.getHighResECEFYHp();
+      int32_t alt = myGNSS.getHighResECEFZ();
+      int8_t alt_hp = myGNSS.getHighResECEFZHp();
+      uint32_t accuracy = myGNSS.getPositionAccuracy();
+
+      epoch = myGNSS.getUnixEpoch(microseconds);
 
       doc["lat"] = lat;
+      doc["lat_hp"] = lat_hp;
       doc["lon"] = lon;
+      doc["lon_hp"] = lon_hp;
       doc["alt"] = alt;
-      doc["epoch"] = time;
+      doc["alt_hp"] = alt_hp;
+      doc["accuracy"] = accuracy;
+      doc["epoch"] = epoch;
       doc["us"] = microseconds;
     }
 
@@ -315,19 +371,19 @@ void loop()
     Serial.println(output);
     Serial2.println(output);
 
-    CAN_message_t msg;
-    msg.id = 0x789;
-    *msg.buf = ticker++;
+    // CAN_message_t msg;
+    // msg.id = 0x789;
+    // *msg.buf = ticker++;
 
-    if (Can0.write(msg) == -1)
-    {
-      Serial2.println("CAN write failed?!?!?!");
-    }
-    else
-    {
-      Serial2.println("Sent CAN message sucessfully!");
-    }
+    // if (Can0.write(msg) == -1)
+    // {
+    //   Serial2.println("CAN write failed?!?!?!");
+    // }
+    // else
+    // {
+    //   Serial2.println("Sent CAN message sucessfully!");
+    // }
   }
 
-  //   imu.sample();  Can0.events();
+  Can0.events();
 }
