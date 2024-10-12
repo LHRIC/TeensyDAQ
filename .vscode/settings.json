@@ -45,7 +45,8 @@
       "stdexcept": "cpp",
       "streambuf": "cpp",
       "cinttypes": "cpp",
-      "typeinfo": "cpp"
+      "typeinfo": "cpp",
+      "cassert": "cpp"
     },
     "cmake.configureOnOpen": false,
     "cmake.sourceDirectory": "C:/Users/Samrut Gadde/Documents/TeensyDAQ/.pio/libdeps/teensy41/Unity"
