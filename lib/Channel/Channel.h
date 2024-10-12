@@ -8,12 +8,13 @@ class Channel {
     public:
         Channel();
         Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, 
-                double DivisorScalar, double AdditiveScalar, std::string Name);
+                double DivisorScalar, double AdditiveScalar, std::string Name, bool IsSigned, bool littleEndian);
         
         uint16_t getValue();
         void setValue(const uint8_t* buf);
 
         double getScaledValue();
+        void setScaledValue(double value);
         void setScaledValue();
 
         uint16_t getChannelId();
@@ -27,6 +28,8 @@ class Channel {
         uint8_t endBit;
         uint8_t numBytes;
         std::string name;
+        bool isSigned;
+        bool littleEndian;
 
         double divisorScalar;
         double additiveScalar;

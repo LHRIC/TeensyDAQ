@@ -6,9 +6,16 @@
 #include <Logger.h>
 #include <unordered_map>
 #include <SparkFun_u-blox_GNSS_v3.h>
+#include <ctime>
+
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
 SFE_UBLOX_GNSS myGNSS;
 uint16_t throttlePos;
+uint32_t epoch;
+uint32_t nanos;
+int32_t lat;
+int32_t lon;
+int32_t alt;
 
 unsigned long previousMillis = 0;
 const long interval = 100;
@@ -20,16 +27,30 @@ Logger sdCard = Logger();
 
 // Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
 // I'm so sorry for swapping between camel and snake case. It was like 3 AM.
-Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm");
-Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map");
-Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps");
-Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp");
-Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage");
-Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps");
-Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda");
-Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa");
+Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm", false, false);
+Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map", false, false);
+Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps", false, false);
+Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp", false, false);
+Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage", false, false);
+Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps", false, false);
+Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda", false, false);
+Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa", false, false);
+Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
+Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, true);
+Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, true);
+Channel fr_adc1 = Channel(0x401, 100, 0, 1, 1, 0, "fr_adc1", false, true);
+Channel fr_adc2 = Channel(0x401, 100, 2, 3, 1, 0, "fr_adc2", false, true);
+Channel fr_adc3 = Channel(0x401, 100, 4, 5, 1, 0, "fr_adc3", false, true);
+Channel fr_adc4 = Channel(0x401, 100, 6, 7, 1, 0, "fr_adc4", false, true);
+Channel rr_adc1 = Channel(0x402, 100, 0, 1, 1, 0, "rr_adc1", false, true);
+Channel rr_adc2 = Channel(0x402, 100, 2, 3, 1, 0, "rr_adc2", false, true);
+Channel rr_adc3 = Channel(0x402, 100, 4, 5, 1, 0, "rr_adc3", false, true);
+Channel rr_adc4 = Channel(0x402, 100, 6, 7, 1, 0, "rr_adc4", false, true);
+Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, false);
+Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, false);
+Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, false);
 
-std::unordered_map<uint16_t, Channel> channelMap = {
+std::unordered_multimap<uint16_t, Channel> channelMap = {
     {rpm_c.getChannelId(), rpm_c},
     {map_c.getChannelId(), map_c},
     {tps_c.getChannelId(), tps_c},
@@ -37,100 +58,68 @@ std::unordered_map<uint16_t, Channel> channelMap = {
     {batt_voltage_c.getChannelId(), batt_voltage_c},
     {apps_c.getChannelId(), apps_c},
     {o2_c.getChannelId(), o2_c},
-    // {flat_shift_switch_c.getChannelId(), flat_shift_switch_c},
-    // {gear_c.getChannelId(), gear_c},
-    {oil_pa_c.getChannelId(), oil_pa_c}};
+    {gear.getChannelId(), gear},
+    {oil_pa_c.getChannelId(), oil_pa_c},
+    {cg_accel_x.getChannelId(), cg_accel_x},
+    {cg_accel_y.getChannelId(), cg_accel_y},
+    {cg_accel_z.getChannelId(), cg_accel_z},
+    {fr_adc1.getChannelId(), fr_adc1},
+    {fr_adc2.getChannelId(), fr_adc2},
+    {fr_adc3.getChannelId(), fr_adc3},
+    {fr_adc4.getChannelId(), fr_adc4},
+    {rr_adc1.getChannelId(), rr_adc1},
+    {rr_adc2.getChannelId(), rr_adc2},
+    {rr_adc3.getChannelId(), rr_adc3},
+    {rr_adc4.getChannelId(), rr_adc4}
+};
 
 DynamicJsonDocument doc(2048);
 
 const int ledPin = 13; // the number of the LED pin
 int ledState = LOW;    // ledState used to set the LED
 
-void gearIndication(int rawGearInd)
-{
-  Serial.println("Raw Gear Indication: ");
-  Serial.print(rawGearInd);
-  // current crankshaft RPM
-  int rpm = doc["rpm"];
-
-  // current gear
-  uint8_t gear = -1;
-
-  // crank/gear ratio
-  float ratio = rawGearInd / rpm;
-
-  if (ratio > 0.4 && ratio < 0.46)
-  {
-    gear = 1;
-  }
-  else if (ratio > 0.56 && ratio < 0.62)
-  {
-    gear = 2;
-  }
-  else if (ratio > 0.68 && ratio < 0.74)
-  {
-    gear = 3;
-  }
-  else if (ratio > 0.79 && ratio < 0.85)
-  {
-    gear = 4;
-  }
-  else if (ratio > 0.88 && ratio < 0.94)
-  {
-    gear = 5;
-  }
-  else if (ratio > 0.95 && ratio < 1.01)
-  {
-    gear = 6;
-  }
-  else if (ratio < 0.1)
-  {
-    // neutral
-    gear = 0;
-  }
-
-  // Transmit over CAN
-  CAN_message_t msg;
-  msg.id = 0x100;
-  msg.len = 1;
-  msg.buf[0] = gear;
-  Can0.write(msg);
-}
-
 void canSniff(const CAN_message_t &msg)
 {
-  // File dataFile = SD.open("0x640data.txt", FILE_WRITE);
-  /*
-  Serial.print("MB "); Serial.print(msg.mb);
-  Serial.print("  OVERRUN: "); Serial.print(msg.flags.overrun);
-  Serial.print("  LEN: "); Serial.print(msg.len);
-  Serial.print(" EXT: "); Serial.print(msg.flags.extended);
-  Serial.print(" TS: "); Serial.print(msg.timestamp);
-  */
-  // Serial.print(" ID: "); Serial.print(msg.id, HEX);Serial.println();
-  /*
-  Serial.print(" Buffer: ");
-  Serial.println();
-  */
-
-  Serial.print("ID RECV: ");
-  Serial.print(msg.id, HEX);
-
   // Find the channel that matches the incoming message.
-  Channel curChannel = channelMap[msg.id];
-  if (curChannel.getName() == "")
+  auto range = channelMap.equal_range(msg.id);
+  for (auto it = range.first; it != range.second; ++it)
   {
-    return;
-  }
+    Channel &curChannel = it->second;
+    if (curChannel.getName().empty())
+    {
+      continue;
+    }
 
-  curChannel.setValue(msg.buf);
-  curChannel.setScaledValue();
-  doc[curChannel.getName()] = curChannel.getScaledValue();
-
-  if (curChannel.getName() == "gear_ind_raw")
-  {
-    gearIndication(curChannel.getScaledValue());
+    curChannel.setValue(msg.buf);
+    curChannel.setScaledValue();
+    doc[curChannel.getName()] = curChannel.getValue();
   }
+}
+
+void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct)
+{
+  std::tm timeinfo = {};
+  timeinfo.tm_year = ubxDataStruct->year - 1900;
+  timeinfo.tm_mon = ubxDataStruct->month - 1;
+  timeinfo.tm_mday = ubxDataStruct->day;
+  timeinfo.tm_hour = ubxDataStruct->hour;
+  timeinfo.tm_min = ubxDataStruct->min;
+  timeinfo.tm_sec = ubxDataStruct->sec;
+
+  nanos = ubxDataStruct->nano / 1000;
+
+  epoch = mktime(&timeinfo);
+  lat = ubxDataStruct->lat;
+  lon = ubxDataStruct->lon;
+  alt = ubxDataStruct->hMSL;
+
+  doc["lat"] = lat;
+  doc["lon"] = lon;
+  doc["alt"] = alt;
+  doc["epoch"] = epoch;
+  doc["nanos"] = nanos;
+
+  // Serial.println("lat: " + String(lat) + " lon: " + String(lon) + " alt: " + String(alt) + " epoch: " + String(epoch));
 }
 
 void setup(void)
@@ -163,9 +152,11 @@ void setup(void)
   myGNSS.setI2COutput(COM_TYPE_UBX);
   myGNSS.setVal8(UBLOX_CFG_SIGNAL_GPS_L5_ENA, 1); // Enable L5 band for GPS
 
-  myGNSS.setNavigationFrequency(40); // 40 Hz
+  myGNSS.setNavigationFrequency(40); // 40 Hz solutions update rate
 
   myGNSS.setGPSL5HealthOverride(true); // Mark L5 signals as healthy - store in RAM and BBR
+
+  myGNSS.setAutoPVTcallbackPtr(gpsPVTCallback); // Register the callback function
 
   myGNSS.softwareResetGNSSOnly(); // Restart the GNSS to apply the L5 health override
 
@@ -182,6 +173,8 @@ void setup(void)
     // Wait for GPS to get a fix
     while (myGNSS.getTimeValid() == false || myGNSS.getDateValid() == false)
     {
+      myGNSS.checkUblox();     // Check for the arrival of new data and process it.
+      myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
       Serial.println("Waiting for GPS fix...");
       delay(1000);
     }
@@ -194,44 +187,45 @@ void setup(void)
     sdCard.startLogging();
 
     // Get MessageDefinitions.csv from the SD card
-    File file = SD.open("MessageDefinitions.csv", FILE_READ);
+    // File file = SD.open("MessageDefinitions.csv", FILE_READ);
 
-    if (file)
-    {
-      Serial.println("MessageDefinitions.csv:");
-      // Read line by line
-      while (file.available())
-      {
-        String line = file.readStringUntil('\n');
+    // if (file)
+    // {
+    //   Serial.println("MessageDefinitions.csv:");
+    //   // Read line by line
+    //   while (file.available())
+    //   {
+    //     String line = file.readStringUntil('\n');
 
-        // Split line by comma
-        String tokens[CHANNEL_PARAMETERS];
-        int i = 0;
-        int pos = 0;
-        while (line.indexOf(',') != -1)
-        {
-          pos = line.indexOf(',');
-          tokens[i] = line.substring(0, pos);
-          line = line.substring(pos + 1);
-          i++;
-        }
+    //     // Split line by comma
+    //     String tokens[CHANNEL_PARAMETERS];
+    //     int i = 0;
+    //     int pos = 0;
+    //     while (line.indexOf(',') != -1)
+    //     {
+    //       pos = line.indexOf(',');
+    //       tokens[i] = line.substring(0, pos);
+    //       line = line.substring(pos + 1);
+    //       i++;
+    //     }
 
-        // Add channel to map
-        Channel newChannel = Channel(tokens[0].toInt(),
-                                     tokens[1].toInt(), tokens[2].toInt(),
-                                     tokens[3].toInt(), tokens[4].toInt(),
-                                     tokens[5].toInt(), tokens[6].c_str());
+    //     // Add channel to map
+    //     Channel newChannel = Channel(tokens[0].toInt(),
+    //                                  tokens[1].toInt(), tokens[2].toInt(),
+    //                                  tokens[3].toInt(), tokens[4].toInt(),
+    //                                  tokens[5].toInt(), tokens[6].c_str());
 
-        channelMap[newChannel.getChannelId()] = newChannel;
+    //     // channelMap[newChannel.getChannelId()] = newChannel;
+    //     channelMap.insert({newChannel.getChannelId(), newChannel});
 
-        Serial.println(line);
-      }
-      file.close();
-    }
-    else
-    {
-      Serial.println("Failed to open MessageDefinitions.csv");
-    }
+    //     Serial.println(line);
+    //   }
+    //   file.close();
+    // }
+    // else
+    // {
+    //   Serial.println("Failed to open MessageDefinitions.csv");
+    // }
   }
   else
   {
@@ -285,37 +279,6 @@ void loop()
 
     digitalWrite(ledPin, ledState);
 
-    int32_t lat;
-    int32_t lon;
-    int32_t alt;
-    uint32_t epoch;
-    uint32_t microseconds;
-
-    // Read GPS data
-    if (myGNSS.getNAVHPPOSECEF() == true)
-    {
-      // First, let's collect the position data
-      int32_t lat = myGNSS.getHighResECEFX();
-      int8_t lat_hp = myGNSS.getHighResECEFXHp();
-      int32_t lon = myGNSS.getHighResECEFY();
-      int8_t lon_hp = myGNSS.getHighResECEFYHp();
-      int32_t alt = myGNSS.getHighResECEFZ();
-      int8_t alt_hp = myGNSS.getHighResECEFZHp();
-      uint32_t accuracy = myGNSS.getPositionAccuracy();
-
-      epoch = myGNSS.getUnixEpoch(microseconds);
-
-      doc["lat"] = lat;
-      doc["lat_hp"] = lat_hp;
-      doc["lon"] = lon;
-      doc["lon_hp"] = lon_hp;
-      doc["alt"] = alt;
-      doc["alt_hp"] = alt_hp;
-      doc["accuracy"] = accuracy;
-      doc["epoch"] = epoch;
-      doc["us"] = microseconds;
-    }
-
     // Remote CAN request
     // Bytes 0-1: 11 bit CAN ID
     // Bytes 2-9: 8 bytes payload
@@ -362,14 +325,26 @@ void loop()
     // s.toCharArray(sc, 100);
     // sdCard.println(sc);
 
-    char output[256] = {0};
+    // print outputs to teleplot
+    for (auto it = channelMap.begin(); it != channelMap.end(); it++)
+    {
+      Channel curChannel = it->second;
+      std::string name = ">" + curChannel.getName() + ":";
+      Serial.print(name.c_str());
+      Serial.println(curChannel.getScaledValue());
+
+      Serial2.print(name.c_str());
+      Serial2.println(curChannel.getScaledValue());
+    }
+
+    char output[1024] = {0};
 
     serializeJson(doc, output);
 
     // Serialize data and send that bitch
     sdCard.println(output);
-    Serial.println(output);
-    Serial2.println(output);
+    // Serial.println(output);
+    // Serial2.println(output);
 
     // CAN_message_t msg;
     // msg.id = 0x789;
@@ -385,5 +360,7 @@ void loop()
     // }
   }
 
+  myGNSS.checkUblox();     // Check for the arrival of new data and process it.
+  myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
   Can0.events();
 }
