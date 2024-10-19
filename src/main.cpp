@@ -171,7 +171,8 @@ void setup(void)
     String filename = "";
 
     // Wait for GPS to get a fix
-    while (myGNSS.getTimeValid() == false || myGNSS.getDateValid() == false)
+    uint32_t start_gps_init = millis();
+    while ((myGNSS.getTimeValid() == false || myGNSS.getDateValid() == false) && (millis() - start_gps_init <= 15000))
     {
       myGNSS.checkUblox();     // Check for the arrival of new data and process it.
       myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
@@ -241,24 +242,11 @@ void setup(void)
   Can0.setBaudRate(1000000);
   // Max number of CAN mailboxes.
   Can0.setMaxMB(64);
-  // Do not use FIFO, use interrupt based CAN instead.
-  // Can0.enableMBInterrupts();
+
+  // CAN FIFO
   Can0.enableFIFO();
   Can0.enableFIFOInterrupt();
   Can0.onReceive(canSniff);
-  // Setup listeners for three mailboxe
-  // Can0.onReceive(MB0, canSniff);
-  // Can0.onReceive(MB1, canSniff);
-  // Can0.onReceive(MB2, canSniff);
-
-  // CAN filter setup, start by only accepting messages for these IDs.
-  // Can0.setMBFilter(REJECT_ALL);
-  // Can0.setMBFilter(MB0, 0x360, 0x3E0, 0x372, 0x471, 0x368);
-  // Can0.enhanceFilter(MB0);
-  // Can0.setMBFilter(MB1, 0x3E4, 0x470, 0x361);
-  // Can0.enhanceFilter(MB1);
-  // Can0.setMBFilter(MB2, 0x100);
-  // Can0.enhanceFilter(MB2);
 
   Can0.mailboxStatus();
 
@@ -307,35 +295,25 @@ void loop()
 
     String s = String();
 
-    // for (auto it = channelMap.begin(); it != channelMap.end(); it++)
-    // {
-    //   Channel curChannel = it->second;
-    //   sensorMessage.set_timestamp(currentMillis);
-    //   sensorMessage.set_canId(curChannel.getChannelId());
-    //   // convert value to 8 bytes
-    //   for (int i = 0; i < 8; i++)
-    //   {
-    //     sensorMessage.mutable_data()[i] = curChannel.getValue() >> (i * 8);
-    //   }
-    // }
-
-    // Serial.println(s);
-
-    // char sc[100];
-    // s.toCharArray(sc, 100);
-    // sdCard.println(sc);
-
     // print outputs to teleplot
     for (auto it = channelMap.begin(); it != channelMap.end(); it++)
     {
       Channel curChannel = it->second;
       std::string name = ">" + curChannel.getName() + ":";
-      Serial.print(name.c_str());
-      Serial.println(curChannel.getScaledValue());
+      //Serial.print(name.c_str());
+      //Serial.println(curChannel.getScaledValue());
 
       Serial2.print(name.c_str());
       Serial2.println(curChannel.getScaledValue());
     }
+    //Serial.print(">lat:");
+    //Serial.println((float) doc["lat"]);
+    //Serial.print(">long:");
+    //Serial.println((float) doc["lon"]);
+    Serial2.print(">lat:");
+    Serial2.println((float) doc["lat"]);
+    Serial2.print(">long:");
+    Serial2.println((float) doc["lon"]);
 
     char output[1024] = {0};
 
@@ -343,21 +321,6 @@ void loop()
 
     // Serialize data and send that bitch
     sdCard.println(output);
-    // Serial.println(output);
-    // Serial2.println(output);
-
-    // CAN_message_t msg;
-    // msg.id = 0x789;
-    // *msg.buf = ticker++;
-
-    // if (Can0.write(msg) == -1)
-    // {
-    //   Serial2.println("CAN write failed?!?!?!");
-    // }
-    // else
-    // {
-    //   Serial2.println("Sent CAN message sucessfully!");
-    // }
   }
 
   myGNSS.checkUblox();     // Check for the arrival of new data and process it.
