@@ -1,32 +1,37 @@
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
-#include <SPI.h>
-#include <Channel.h>
-#include <ArduinoJson-v6.21.2.h>
-#include <Logger.h>
-#include <unordered_map>
-#include <SparkFun_u-blox_GNSS_v3.h>
 #include <ctime>
+#include <unordered_map>
+
+#include <TeensyThreads.h>
+#include <SparkFun_u-blox_GNSS_v3.h>
+#include <ArduinoJson-v6.21.2.h>
+
+#include <Channel.h>
+#include <Logger.h>
+
+#define SERIAL_USB Serial
+#define SERIAL_XBEE Serial2
+
+#define LED_PIN 13
+#define DATALOG_PIN 40
+
+Threads::Mutex usbSerialLock;
+Threads::Mutex xBeeSerialLock;
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
-SFE_UBLOX_GNSS myGNSS;
-uint16_t throttlePos;
+
+SFE_UBLOX_GNSS gnssModule;
 uint32_t epoch;
 uint32_t nanos;
 int32_t lat;
 int32_t lon;
 int32_t alt;
 
-unsigned long previousMillis = 0;
-const long interval = 100;
-int ticker = 0;
-int ZIGBEE_UART_BAUDRATE = 115200;
-int CHANNEL_PARAMETERS = 7;
+DynamicJsonDocument doc(2048);
 
 Logger sdCard = Logger();
 
-// Define and initialize CAN channels with IDs, byte offsets, and scalar modifiers.
-// I'm so sorry for swapping between camel and snake case. It was like 3 AM.
 Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm", false, false);
 Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map", false, false);
 Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps", false, false);
@@ -73,31 +78,79 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
     {rr_adc4.getChannelId(), rr_adc4}
 };
 
-DynamicJsonDocument doc(2048);
+// Thread Co-routines
+void readRadioCommands() {
+    while(1) {
+        // Attempt to acquire mutex
+        while(xBeeSerialLock.try_lock() == 0) {
+            threads.yield();
+        }
 
-const int ledPin = 13; // the number of the LED pin
-int ledState = LOW;    // ledState used to set the LED
+        // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
+        char commandBuffer[10] = {0};
+        SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
 
-void canSniff(const CAN_message_t &msg)
-{
-  // Find the channel that matches the incoming message.
-  auto range = channelMap.equal_range(msg.id);
-  for (auto it = range.first; it != range.second; ++it)
-  {
-    Channel &curChannel = it->second;
-    if (curChannel.getName().empty())
-    {
-      continue;
+        // Do whatever with the buffer
+        CAN_message_t msg;
+        msg.id = (commandBuffer[0] << 8) | commandBuffer[1];
+        msg.len = 8;
+        for (int i = 0; i < msg.len; i++)
+        {
+            msg.buf[i] = commandBuffer[i + 2];
+        }
+
+        Can0.write(msg);
+
+        // Release the mutex
+        xBeeSerialLock.unlock();
+
+        // Yield to the next thread
+        threads.yield();
     }
-
-    curChannel.setValue(msg.buf);
-    curChannel.setScaledValue();
-    doc[curChannel.getName()] = curChannel.getValue();
-  }
 }
 
-void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct)
-{
+void transmitCANData() {
+    while(1) {
+        // Attempt to acquire mutex
+        while(xBeeSerialLock.try_lock() == 0) {
+            threads.yield();
+        }
+
+        for (auto it = channelMap.begin(); it != channelMap.end(); it++)
+        {
+            Channel curChannel = it->second;
+            std::string name = ">" + curChannel.getName() + ":";
+            //Serial.print(name.c_str());
+            //Serial.println(curChannel.getScaledValue());
+
+            SERIAL_XBEE.print(name.c_str());
+            SERIAL_XBEE.println(curChannel.getScaledValue());
+
+            SERIAL_XBEE.print(">lat:");
+            SERIAL_XBEE.println((float) doc["lat"]);
+            SERIAL_XBEE.print(">long:");
+            SERIAL_XBEE.println((float) doc["lon"]);
+        }
+        
+        threads.yield();
+    }
+}
+
+void writeSDCardData() {
+    while(1) {
+        char output[1024] = {0};
+
+        serializeJson(doc, output);
+
+        // Serialize data and send that bitch
+        sdCard.println(output);
+
+        threads.delay(100);
+    }
+}
+
+// ISR Callbacks
+void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct) {
   std::tm timeinfo = {};
   timeinfo.tm_year = ubxDataStruct->year - 1900;
   timeinfo.tm_mon = ubxDataStruct->month - 1;
@@ -122,208 +175,118 @@ void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct)
   // Serial.println("lat: " + String(lat) + " lon: " + String(lon) + " alt: " + String(alt) + " epoch: " + String(epoch));
 }
 
-void setup(void)
-{
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, HIGH);
-
-  pinMode(40, INPUT_PULLDOWN);
-
-  // USB
-  Serial.begin(115200);
-
-  // Zigbee UART
-  Serial2.begin(ZIGBEE_UART_BAUDRATE);
-
-  Serial.println("Serial Port initialized at " + String(ZIGBEE_UART_BAUDRATE) + " baud");
-
-  // Initialize GPS I2C
-  Wire.begin();
-  Wire.setClock(400E3);
-
-  // myGNSS.enableDebugging();
-
-  while (myGNSS.begin() == false)
-  {
-    Serial.println(F("u-blox GNSS not detected at default I2C address. Retrying..."));
-    delay(1000);
-  }
-
-  myGNSS.setI2COutput(COM_TYPE_UBX);
-  myGNSS.setVal8(UBLOX_CFG_SIGNAL_GPS_L5_ENA, 1); // Enable L5 band for GPS
-
-  myGNSS.setNavigationFrequency(40); // 40 Hz solutions update rate
-
-  myGNSS.setGPSL5HealthOverride(true); // Mark L5 signals as healthy - store in RAM and BBR
-
-  myGNSS.setAutoPVTcallbackPtr(gpsPVTCallback); // Register the callback function
-
-  myGNSS.softwareResetGNSSOnly(); // Restart the GNSS to apply the L5 health override
-
-  Serial.println("Initialized GPS I2C communication");
-
-  // Initialize SD Card
-  uint8_t sdInitStatus = sdCard.initialize();
-  if (sdInitStatus == 0)
-  {
-    Serial.println("SD Card initialized successfully");
-
-    String filename = "";
-
-    // Wait for GPS to get a fix
-    uint32_t start_gps_init = millis();
-    while ((myGNSS.getTimeValid() == false || myGNSS.getDateValid() == false) && (millis() - start_gps_init <= 15000))
+void onCANMessageCallback(const CAN_message_t &msg) {    
+    // Find the channel that matches the incoming message.
+    auto range = channelMap.equal_range(msg.id);
+    for (auto it = range.first; it != range.second; ++it)
     {
-      myGNSS.checkUblox();     // Check for the arrival of new data and process it.
-      myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
-      Serial.println("Waiting for GPS fix...");
-      delay(1000);
+        Channel &curChannel = it->second;
+        if (curChannel.getName().empty())
+        {
+            continue;
+        }
+
+        curChannel.setValue(msg.buf);
+        curChannel.setScaledValue();
+        doc[curChannel.getName()] = curChannel.getValue();
+    }
+}
+
+// Initial Setup
+void setupGPS() {
+    while (gnssModule.begin() == false) {
+        SERIAL_USB.println(F("u-blox GNSS not detected at default I2C address. Retrying..."));
+        delay(1000);
     }
 
-    // Get the current time in Unix Epoch format
-    int32_t unixEpoch = myGNSS.getUnixEpoch();
-    filename = "log_" + String(unixEpoch) + ".txt";
+    gnssModule.setI2COutput(COM_TYPE_UBX);
+    gnssModule.setVal8(UBLOX_CFG_SIGNAL_GPS_L5_ENA, 1); // Enable L5 band for GPS
 
-    sdCard.setFilename((char *)filename.c_str());
-    sdCard.startLogging();
+    gnssModule.setNavigationFrequency(40); // 40 Hz solutions update rate
 
-    // Get MessageDefinitions.csv from the SD card
-    // File file = SD.open("MessageDefinitions.csv", FILE_READ);
+    gnssModule.setGPSL5HealthOverride(true); // Mark L5 signals as healthy - store in RAM and BBR
 
-    // if (file)
-    // {
-    //   Serial.println("MessageDefinitions.csv:");
-    //   // Read line by line
-    //   while (file.available())
-    //   {
-    //     String line = file.readStringUntil('\n');
+    gnssModule.setAutoPVTcallbackPtr(gpsPVTCallback); // Register the callback function
 
-    //     // Split line by comma
-    //     String tokens[CHANNEL_PARAMETERS];
-    //     int i = 0;
-    //     int pos = 0;
-    //     while (line.indexOf(',') != -1)
-    //     {
-    //       pos = line.indexOf(',');
-    //       tokens[i] = line.substring(0, pos);
-    //       line = line.substring(pos + 1);
-    //       i++;
-    //     }
+    gnssModule.softwareResetGNSSOnly(); // Restart the GNSS to apply the L5 health override
 
-    //     // Add channel to map
-    //     Channel newChannel = Channel(tokens[0].toInt(),
-    //                                  tokens[1].toInt(), tokens[2].toInt(),
-    //                                  tokens[3].toInt(), tokens[4].toInt(),
-    //                                  tokens[5].toInt(), tokens[6].c_str());
+    SERIAL_USB.println("Initialized GPS I2C communication");
+}
 
-    //     // channelMap[newChannel.getChannelId()] = newChannel;
-    //     channelMap.insert({newChannel.getChannelId(), newChannel});
+void waitForGPSFix() {
+    // Wait for GPS to get a fix (timeout after 15s)
+    uint32_t startGPSInitTime = millis();
+    while ((gnssModule.getTimeValid() == false || gnssModule.getDateValid() == false) && (millis() - startGPSInitTime <= 15000))
+    {
+      gnssModule.checkUblox();     // Check for the arrival of new data and process it.
+      gnssModule.checkCallbacks(); // Check if any callbacks are waiting to be processed.
+      SERIAL_USB.println("Waiting for GPS fix...");
+      delay(500);
+    }
+}
 
-    //     Serial.println(line);
-    //   }
-    //   file.close();
-    // }
-    // else
-    // {
-    //   Serial.println("Failed to open MessageDefinitions.csv");
-    // }
-  }
-  else
-  {
-    Serial.println("SD Card initialization failed");
-  }
+void setupCANBus() {
+    Can0.begin();
+    Can0.setBaudRate(1E6);
+    Can0.setMaxMB(64);
 
-  pinMode(6, OUTPUT);
-  digitalWrite(6, LOW);
+    Can0.enableFIFO();
+    Can0.enableFIFOInterrupt();
+    Can0.onReceive(onCANMessageCallback);
 
-  // Holy mother of god CAN configuration is a pain in the ass.
-  Can0.begin();
-  // 1 million baud, ensure that this64 matches the ECU & Display CAN baud rate.
-  Can0.setBaudRate(1000000);
-  // Max number of CAN mailboxes.
-  Can0.setMaxMB(64);
+    Can0.mailboxStatus();
+}
 
-  // CAN FIFO
-  Can0.enableFIFO();
-  Can0.enableFIFOInterrupt();
-  Can0.onReceive(canSniff);
+void setupSDCard() {
+    uint8_t sdInitStatus = sdCard.initialize();
+    if (sdInitStatus == 0) {
+        SERIAL_USB.println("SD Card initialized successfully");
 
-  Can0.mailboxStatus();
+        // Get the current time in Unix Epoch format
+        int32_t unixEpoch = gnssModule.getUnixEpoch();
+        String filename = "log_" + String(unixEpoch) + ".txt";
 
-  digitalWrite(ledPin, LOW);
+        sdCard.setFilename((char *)filename.c_str());
+        sdCard.startLogging();
+    } else {
+        SERIAL_USB.println("SD Card initialization failed");
+    }
+}
 
-  //   isRecording = 1;
+void setup(void)
+{
+    // Setup GPIO
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(DATALOG_PIN, INPUT_PULLDOWN);
+    digitalWrite(LED_PIN, HIGH);
+    
+    // UART Channel Setup
+    SERIAL_USB.begin(115200);
+    SERIAL_XBEE.begin(115200);
+
+    // Intialize I2C Bus for GPS communication
+    Wire.begin();
+    Wire.setClock(400E3);
+
+    setupGPS();
+    waitForGPSFix();
+
+    setupSDCard();
+
+    setupCANBus();
+
+    // Dispatch threads
+
+    threads.addThread(readRadioCommands);
+    threads.addThread(transmitCANData);
+    threads.addThread(writeSDCardData);
+
+    digitalWrite(LED_PIN, LOW);
 }
 
 void loop()
 {
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= interval)
-  {
-    previousMillis = currentMillis;
-
-    ledState = ledState == LOW ? HIGH : LOW;
-
-    digitalWrite(ledPin, ledState);
-
-    // Remote CAN request
-    // Bytes 0-1: 11 bit CAN ID
-    // Bytes 2-9: 8 bytes payload
-    byte remoteCanPayload[10] = {0};
-    while (Serial.available())
-    {
-      Serial.readBytes((char *)remoteCanPayload, 10);
-      // Serial2.readBytes(remoteCanPayload, 10);
-      CAN_message_t msg;
-      msg.id = (remoteCanPayload[0] << 8) | remoteCanPayload[1];
-      msg.len = 8;
-      for (int i = 0; i < msg.len; i++)
-      {
-        msg.buf[i] = remoteCanPayload[i];
-      }
-
-      if (Can0.write(msg) != -1)
-      {
-        Serial.println("Remote CAN request sent: 0x" + String(msg.id, HEX));
-      }
-      else
-      {
-        Serial.println("Remote CAN request queued/failed: 0x" + String(msg.id, HEX));
-      }
-    }
-
-    String s = String();
-
-    // print outputs to teleplot
-    for (auto it = channelMap.begin(); it != channelMap.end(); it++)
-    {
-      Channel curChannel = it->second;
-      std::string name = ">" + curChannel.getName() + ":";
-      //Serial.print(name.c_str());
-      //Serial.println(curChannel.getScaledValue());
-
-      Serial2.print(name.c_str());
-      Serial2.println(curChannel.getScaledValue());
-    }
-    //Serial.print(">lat:");
-    //Serial.println((float) doc["lat"]);
-    //Serial.print(">long:");
-    //Serial.println((float) doc["lon"]);
-    Serial2.print(">lat:");
-    Serial2.println((float) doc["lat"]);
-    Serial2.print(">long:");
-    Serial2.println((float) doc["lon"]);
-
-    char output[1024] = {0};
-
-    serializeJson(doc, output);
-
-    // Serialize data and send that bitch
-    sdCard.println(output);
-  }
-
-  myGNSS.checkUblox();     // Check for the arrival of new data and process it.
-  myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
-  Can0.events();
+    gnssModule.checkUblox();     // Check for the arrival of new data and process it.
+    gnssModule.checkCallbacks(); // Check if any callbacks are waiting to be processed.
+    Can0.events();
 }
