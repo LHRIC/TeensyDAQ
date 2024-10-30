@@ -11,6 +11,7 @@ class Channel {
                 double DivisorScalar, double AdditiveScalar, std::string Name, bool IsSigned, bool littleEndian);
         
         uint16_t getValue();
+        int16_t getSignedValue();
         void setValue(const uint8_t* buf);
 
         double getScaledValue();
@@ -19,7 +20,7 @@ class Channel {
 
         uint16_t getChannelId();
         std::string getName();
-
+        bool getIsSigned();
 
     private:
         uint16_t channelId;
