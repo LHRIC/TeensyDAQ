@@ -4,9 +4,9 @@
 #include <Channel.h>
 #include <ArduinoJson-v6.21.2.h>
 #include <Logger.h>
-#include <unordered_map>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <ctime>
+#include <unordered_map>
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
 SFE_UBLOX_GNSS myGNSS;
@@ -38,6 +38,8 @@ Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa", false, false);
 Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
 Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, true);
 Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, true);
+Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, true);
+Channel fl_adc4 = Channel(0x404, 100, 6, 7, 1, 0, "fl_adc4", false, true);
 Channel fr_adc1 = Channel(0x401, 100, 0, 1, 1, 0, "fr_adc1", false, true);
 Channel fr_adc2 = Channel(0x401, 100, 2, 3, 1, 0, "fr_adc2", false, true);
 Channel fr_adc3 = Channel(0x401, 100, 4, 5, 1, 0, "fr_adc3", false, true);
@@ -46,9 +48,9 @@ Channel rr_adc1 = Channel(0x402, 100, 0, 1, 1, 0, "rr_adc1", false, true);
 Channel rr_adc2 = Channel(0x402, 100, 2, 3, 1, 0, "rr_adc2", false, true);
 Channel rr_adc3 = Channel(0x402, 100, 4, 5, 1, 0, "rr_adc3", false, true);
 Channel rr_adc4 = Channel(0x402, 100, 6, 7, 1, 0, "rr_adc4", false, true);
-Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, false);
-Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, false);
-Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, false);
+Channel cg_accel_x = Channel(0x732, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
+Channel cg_accel_y = Channel(0x732, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
+Channel cg_accel_z = Channel(0x732, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
 
 std::unordered_multimap<uint16_t, Channel> channelMap = {
     {rpm_c.getChannelId(), rpm_c},
@@ -70,8 +72,12 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
     {rr_adc1.getChannelId(), rr_adc1},
     {rr_adc2.getChannelId(), rr_adc2},
     {rr_adc3.getChannelId(), rr_adc3},
-    {rr_adc4.getChannelId(), rr_adc4}
-};
+    {rr_adc4.getChannelId(), rr_adc4},
+    {fl_adc1.getChannelId(), fl_adc1},
+    {fl_adc2.getChannelId(), fl_adc2},
+    {fl_adc3.getChannelId(), fl_adc3},
+    {fl_adc4.getChannelId(), fl_adc4}
+  };
 
 DynamicJsonDocument doc(2048);
 
@@ -152,7 +158,7 @@ void setup(void)
   myGNSS.setI2COutput(COM_TYPE_UBX);
   myGNSS.setVal8(UBLOX_CFG_SIGNAL_GPS_L5_ENA, 1); // Enable L5 band for GPS
 
-  myGNSS.setNavigationFrequency(40); // 40 Hz solutions update rate
+  myGNSS.setNavigationFrequency(20); // 40 Hz solutions update rate
 
   myGNSS.setGPSL5HealthOverride(true); // Mark L5 signals as healthy - store in RAM and BBR
 
@@ -182,7 +188,7 @@ void setup(void)
     // Get the current time in Unix Epoch format
     int32_t unixEpoch = myGNSS.getUnixEpoch();
     filename = "log_" + String(unixEpoch) + ".txt";
-
+    // urmommy
     sdCard.setFilename((char *)filename.c_str());
     sdCard.startLogging();
 
@@ -330,10 +336,22 @@ void loop()
     {
       Channel curChannel = it->second;
       std::string name = ">" + curChannel.getName() + ":";
+      bool isSigned = curChannel.getIsSigned();
       Serial.print(name.c_str());
-      Serial.println(curChannel.getScaledValue());
-
       Serial2.print(name.c_str());
+
+      // if (isSigned)
+      // {
+      //   Serial.println(curChannel.getSignedValue());
+      //   Serial2.println(curChannel.getSignedValue());
+      // }
+      // else
+      // {
+      //   Serial.println(curChannel.getValue());
+      //   Serial2.println(curChannel.getValue());
+      // }
+
+      Serial.println(curChannel.getScaledValue());
       Serial2.println(curChannel.getScaledValue());
     }
 
@@ -360,7 +378,7 @@ void loop()
     // }
   }
 
-  myGNSS.checkUblox();     // Check for the arrival of new data and process it.
-  myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
+  // myGNSS.checkUblox();     // Check for the arrival of new data and process it.
+  // myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
   Can0.events();
 }

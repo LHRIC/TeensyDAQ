@@ -23,6 +23,10 @@ uint16_t Channel::getValue(){
     return value;
 }
 
+int16_t Channel::getSignedValue() {
+    return static_cast<int16_t>(value);
+}
+
 // void Channel::setValue(const uint8_t* buf) {
 //     // Assumes 16 bit Big Endian encoded data.
 //     // Change to a more robust system later
@@ -59,7 +63,11 @@ double Channel::getScaledValue() {
 }
 
 void Channel::setScaledValue() {
-    scaledValue = (value / divisorScalar) + additiveScalar;
+    if (isSigned) {
+        scaledValue = static_cast<double>((static_cast<int16_t>(value) / divisorScalar) + additiveScalar);
+    } else {
+        scaledValue = static_cast<double>((value / divisorScalar) + additiveScalar);
+    }
 }
 
 void Channel::setScaledValue(double value) {
@@ -72,5 +80,9 @@ uint16_t Channel::getChannelId() {
 
 std::string Channel::getName() {
     return name;
+}
+
+bool Channel::getIsSigned() {
+    return isSigned;
 }
 
