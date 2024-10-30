@@ -8,18 +8,18 @@ class Logger {
     public:
         Logger();
 
-        uint8_t Logger::initialize();
-        void Logger::startLogging();
-        void Logger::println(char* line);
-        void Logger::println(char* line, uint32_t sec, uint32_t us);
-        void Logger::getFilename();
-        void Logger::setFilename(char* name);
+        uint8_t initialize();
+        void startLogging();
+        void println(char* line);
+        void println(char* line, uint32_t sec, uint32_t us);
+        void getFilename();
+        void setFilename(char* name);
     private:
         String line;
         File activeFile;
         char filename[100];
-        void Logger::openFile();
-        void Logger::closeFile();
+        void openFile();
+        void closeFile();
 };
 
 #endif
