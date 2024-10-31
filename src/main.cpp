@@ -4,14 +4,20 @@
 #include <unordered_map>
 
 #include <ArduinoJson-v6.21.2.h>
+#include <EEPROM.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include <TeensyThreads.h>
 
 #include <Channel.h>
 #include <Logger.h>
 
-#define SERIAL_USB Serial
-#define SERIAL_XBEE Serial2
+/*#define SERIAL_USB Serial*/
+/*#define SERIAL_XBEE Serial2*/
+ThreadWrap(Serial, serialUsbThreadSafe)
+#define SERIAL_USB ThreadClone(serialUsbThreadSafe)
+
+    ThreadWrap(Serial2, serialXbeeThreadSafe)
+#define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
 
 #define LED_PIN 13
 #define DATALOG_PIN 40
@@ -21,7 +27,7 @@
 #define GPS_INITIALIZE_TIMEOUT_MS 15000
 #define GPS_I2C_CLOCK 400E3
 
-Threads::Mutex usbSerialLock;
+        Threads::Mutex usbSerialLock;
 Threads::Mutex xBeeSerialLock;
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
@@ -100,14 +106,20 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
 void readRadioCommands() {
   while (1) {
     // Attempt to acquire mutex
-    while (xBeeSerialLock.try_lock() == 0) {
-      threads.yield();
-    }
+    /*while (xBeeSerialLock.try_lock() == 0) {*/
+    /*  threads.yield();*/
+    /*}*/
 
     // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
     char commandBuffer[10] = {0};
-    SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
+    while (SERIAL_XBEE.available() > 10) {
+      SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
+    }
+    /*SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);*/
 
+    // Release the mutex
+    /*xBeeSerialLock.unlock();*/
+    /**/
     // Do whatever with the buffer
     CAN_message_t msg;
     msg.id = (commandBuffer[0] << 8) | commandBuffer[1];
@@ -118,9 +130,6 @@ void readRadioCommands() {
 
     Can0.write(msg);
 
-    // Release the mutex
-    xBeeSerialLock.unlock();
-
     // Yield to the next thread
     threads.yield();
   }
@@ -129,9 +138,9 @@ void readRadioCommands() {
 void transmitCANData() {
   while (1) {
     // Attempt to acquire mutex
-    while (xBeeSerialLock.try_lock() == 0) {
-      threads.yield();
-    }
+    /*while (xBeeSerialLock.try_lock() == 0) {*/
+    /*  threads.yield();*/
+    /*}*/
 
     for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
       Channel curChannel = it->second;
@@ -139,13 +148,18 @@ void transmitCANData() {
 
       SERIAL_XBEE.print(name.c_str());
       SERIAL_XBEE.println(curChannel.getScaledValue());
-
-      SERIAL_XBEE.print(">lat:");
-      SERIAL_XBEE.println((float)doc["lat"]);
-      SERIAL_XBEE.print(">long:");
-      SERIAL_XBEE.println((float)doc["lon"]);
     }
 
+    // Send GPS separately since it's not a CAN channel
+    SERIAL_XBEE.print(">lat:");
+    SERIAL_XBEE.println((float)doc["lat"]);
+    SERIAL_XBEE.print(">long:");
+    SERIAL_XBEE.println((float)doc["lon"]);
+
+    // Release mutex
+    /*xBeeSerialLock.unlock();*/
+
+    // Yield to next thread
     threads.yield();
   }
 }
