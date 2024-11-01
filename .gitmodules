@@ -7,3 +7,6 @@
 [submodule "lib/TeensyThreads"]
 	path = lib/TeensyThreads
 	url = git@github.com:ftrias/TeensyThreads.git
+[submodule "lib/SdFat"]
+	path = lib/SdFat
+	url = git@github.com:greiman/SdFat.git

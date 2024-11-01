@@ -16,7 +16,7 @@
 ThreadWrap(Serial, serialUsbThreadSafe)
 #define SERIAL_USB ThreadClone(serialUsbThreadSafe)
 
-    ThreadWrap(Serial2, serialXbeeThreadSafe)
+ThreadWrap(Serial2, serialXbeeThreadSafe)
 #define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
 
 #define LED_PIN 13
@@ -27,7 +27,7 @@ ThreadWrap(Serial, serialUsbThreadSafe)
 #define GPS_INITIALIZE_TIMEOUT_MS 15000
 #define GPS_I2C_CLOCK 400E3
 
-        Threads::Mutex usbSerialLock;
+Threads::Mutex usbSerialLock;
 Threads::Mutex xBeeSerialLock;
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
@@ -47,22 +47,17 @@ Logger sdCard = Logger();
 Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm", false, false);
 Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map", false, false);
 Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps", false, false);
-Channel coolant_temp_c =
-    Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp", false, false);
-Channel batt_voltage_c =
-    Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage", false, false);
+Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp", false, false);
+Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage", false, false);
 Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps", false, false);
 Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda", false, false);
 Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa", false, false);
 Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
 
 // CAN board channels
-Channel cg_accel_x =
-    Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
-Channel cg_accel_y =
-    Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
-Channel cg_accel_z =
-    Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
+Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
+Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
+Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
 Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, true);
 Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, true);
 Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, true);
@@ -105,21 +100,12 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
 // Thread Co-routines
 void readRadioCommands() {
   while (1) {
-    // Attempt to acquire mutex
-    /*while (xBeeSerialLock.try_lock() == 0) {*/
-    /*  threads.yield();*/
-    /*}*/
-
     // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
     char commandBuffer[10] = {0};
     while (SERIAL_XBEE.available() > 10) {
       SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
     }
-    /*SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);*/
 
-    // Release the mutex
-    /*xBeeSerialLock.unlock();*/
-    /**/
     // Do whatever with the buffer
     CAN_message_t msg;
     msg.id = (commandBuffer[0] << 8) | commandBuffer[1];
@@ -137,11 +123,6 @@ void readRadioCommands() {
 
 void transmitCANData() {
   while (1) {
-    // Attempt to acquire mutex
-    /*while (xBeeSerialLock.try_lock() == 0) {*/
-    /*  threads.yield();*/
-    /*}*/
-
     for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
       Channel curChannel = it->second;
       std::string name = ">" + curChannel.getName() + ":";
@@ -156,9 +137,6 @@ void transmitCANData() {
     SERIAL_XBEE.print(">long:");
     SERIAL_XBEE.println((float)doc["lon"]);
 
-    // Release mutex
-    /*xBeeSerialLock.unlock();*/
-
     // Yield to next thread
     threads.yield();
   }
@@ -171,7 +149,7 @@ void writeSDCardData() {
     serializeJson(doc, output);
 
     // Serialize data and send that bitch
-    sdCard.println(output);
+    sdCard.println(output, epoch, nanos / 1000);
 
     threads.delay(100);
   }
@@ -187,7 +165,7 @@ void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct) {
   timeinfo.tm_min = ubxDataStruct->min;
   timeinfo.tm_sec = ubxDataStruct->sec;
 
-  nanos = ubxDataStruct->nano / 1000;
+  nanos = ubxDataStruct->nano;
 
   epoch = mktime(&timeinfo);
   lat = ubxDataStruct->lat;
@@ -219,8 +197,7 @@ void onCANMessageCallback(const CAN_message_t &msg) {
 // Initial Setup
 void setupGPS() {
   while (gnssModule.begin() == false) {
-    SERIAL_USB.println(
-        F("u-blox GNSS not detected at default I2C address. Retrying..."));
+    SERIAL_USB.println(F("u-blox GNSS not detected at default I2C address. Retrying..."));
     delay(1000);
   }
 
@@ -247,8 +224,7 @@ void setupGPS() {
 void waitForGPSFix(uint32_t msTimeout) {
   // Wait for GPS to get a fix (timeout after 15s)
   uint32_t startGPSInitTime = millis();
-  while ((gnssModule.getTimeValid() == false ||
-          gnssModule.getDateValid() == false) &&
+  while ((gnssModule.getTimeValid() == false || gnssModule.getDateValid() == false) &&
          (millis() - startGPSInitTime <= msTimeout)) {
     // Check for the arrival of new data and process it.
     gnssModule.checkUblox();

@@ -8,3 +8,4 @@
 # Clangd
 .cache
 compile_commands.json
+.clang-format
