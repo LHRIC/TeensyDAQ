@@ -6,7 +6,7 @@
 #define SRC_LOGGER_H_
 
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
-#define RING_BUF_CAPACITY 400000
+#define RING_BUF_CAPACITY 100000
 
 // Estimated: 20 byte lines at 100Khz for 10 minutes
 #define LOG_FILE_SIZE 20 * 100000 * 600
