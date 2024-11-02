@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <TeensyThreads.h>
 #include <FlexCAN_T4.h>
 #include <ctime>
 #include <unordered_map>
@@ -6,29 +7,24 @@
 #include <ArduinoJson-v6.21.2.h>
 #include <EEPROM.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
-#include <TeensyThreads.h>
 
 #include <Channel.h>
 #include <Logger.h>
-
-/*#define SERIAL_USB Serial*/
-/*#define SERIAL_XBEE Serial2*/
-ThreadWrap(Serial, serialUsbThreadSafe)
-#define SERIAL_USB ThreadClone(serialUsbThreadSafe)
-
-ThreadWrap(Serial2, serialXbeeThreadSafe)
-#define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
+#include <RPC.h>
 
 #define LED_PIN 13
 #define DATALOG_PIN 40
 
 #define SERIAL_USB_BAUDRATE 115200
 #define SERIAL_XBEE_BAUDRATE 115200
-#define GPS_INITIALIZE_TIMEOUT_MS 15000
+#define GPS_INITIALIZE_TIMEOUT_MS 5000
 #define GPS_I2C_CLOCK 400E3
 
-Threads::Mutex usbSerialLock;
-Threads::Mutex xBeeSerialLock;
+ThreadWrap(Serial, serialUsbThreadSafe)
+#define SERIAL_USB ThreadClone(serialUsbThreadSafe)
+
+ThreadWrap(Serial2, serialXbeeThreadSafe)
+#define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
 
@@ -42,6 +38,8 @@ int32_t alt;
 DynamicJsonDocument doc(2048);
 
 Logger sdCard = Logger();
+
+RadioReceiver xBee = RadioReceiver();
 
 // ECU channels
 Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm", false, false);
@@ -102,8 +100,13 @@ void readRadioCommands() {
   while (1) {
     // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
     char commandBuffer[10] = {0};
-    while (SERIAL_XBEE.available() > 10) {
+    bool hadBytesToRead = false;
+    while (SERIAL_XBEE.available()) {
       SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
+      hadBytesToRead = true;
+    }
+    if (hadBytesToRead) {
+      SERIAL_USB.println("Recv: " + String(commandBuffer));
     }
 
     // Do whatever with the buffer
@@ -152,6 +155,55 @@ void writeSDCardData() {
     sdCard.println(output, epoch, nanos / 1000);
 
     threads.delay(100);
+  }
+}
+
+void rxUART() {
+  while (1) {
+    // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
+    char dataBuf[100] = {0};
+
+    while (SERIAL_XBEE.available()) {
+      char SOFBuf[8] = {0};
+      SERIAL_XBEE.readBytesUntil(SOF_BYTE, SOFBuf, 8);
+      SERIAL_USB.println("SOF Detected");
+
+      char dataLenBuf[2] = {0};
+      SERIAL_XBEE.readBytes(dataLenBuf, 2);
+      uint16_t dataLen = (uint16_t) (dataLenBuf[0] << 8) | dataLenBuf[1];
+      SERIAL_USB.print("Len: ");
+      SERIAL_USB.print(dataLen);
+      SERIAL_USB.println();
+
+      if(dataLen > 0) {
+        SERIAL_XBEE.readBytes(dataBuf, dataLen);
+        SERIAL_USB.print("Data: ");
+        SERIAL_USB.print(String(dataBuf));
+        SERIAL_USB.println();
+
+        char EOFBuf[8] = {0};
+        SERIAL_XBEE.readBytesUntil(EOF_BYTE, EOFBuf, 8);
+      }
+    }
+
+    // Yield to the next thread
+    threads.yield();
+  }
+}
+
+void handleRXing() {
+  while(1) {
+    if(SERIAL_XBEE.available()) {
+      char rxByte = SERIAL_XBEE.read();
+
+      if(rxByte != -1){
+        xBee.parseFrame(rxByte);
+      } else {
+        threads.yield();
+      }
+    } else {
+      threads.yield();
+    }
   }
 }
 
@@ -289,14 +341,16 @@ void setup(void) {
   setupGPS();
   waitForGPSFix(GPS_INITIALIZE_TIMEOUT_MS);
 
-  setupSDCard();
+  //setupSDCard();
 
   setupCANBus();
 
   // Dispatch threads
-  threads.addThread(readRadioCommands);
+  //threads.addThread(readRadioCommands);
   threads.addThread(transmitCANData);
-  threads.addThread(writeSDCardData);
+  //threads.addThread(writeSDCardData);
+
+  threads.addThread(handleRXing);
 
   digitalWrite(LED_PIN, LOW);
 }
