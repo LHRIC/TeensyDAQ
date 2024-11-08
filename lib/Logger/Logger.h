@@ -8,8 +8,8 @@
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
 #define RING_BUF_CAPACITY 100000
 
-// Estimated: 20 byte lines at 100Khz for 10 minutes
-#define LOG_FILE_SIZE 20 * 100000 * 600
+// Estimated: 20 byte lines at 100Khz for 60 minutes
+#define LOG_FILE_SIZE 20 * 100000 * 60
 
 #define SECTOR_SIZE 512
 
@@ -19,6 +19,7 @@ class Logger {
 
         uint8_t initialize();
         void startLogging();
+        void stopLogging();
         void println(char* line, uint32_t sec, uint32_t us);
         void getFilename();
         void setFilename(char* name);

@@ -1,32 +1,42 @@
 #include <Logger.h>
+#include <TeensyThreads.h>
 
-Logger::Logger() {}
+ThreadWrap(Serial, serialUsbThreadSafe3)
+#define SERIAL_USB ThreadClone(serialUsbThreadSafe3)
+
+Logger::Logger() {
+}
 
 uint8_t Logger::initialize() {
-  Serial.println("Initializing SD card...");
+  SERIAL_USB.println("Initializing SD card...");
 
   // Initialize the SD.
   if (!sdCard.begin(SD_CONFIG)) {
-    sdCard.initErrorHalt(&Serial);
+    sdCard.initErrorHalt(&SERIAL_USB);
   }
 
-  Serial.println("card initialized.");
+  SERIAL_USB.println("card initialized.");
   return 0;
 }
 
 void Logger::startLogging() {
   // Open and preallocate file
   if (openFile() != 0) {
-    Serial.println("File Opening Failed");
+    SERIAL_USB.println("File Opening Failed");
   }
 
-  Serial.println("Filename is:");
-  Serial.println(filename);
+  SERIAL_USB.println("Filename is:");
+  SERIAL_USB.println(filename);
+
 }
 
 uint8_t Logger::openFile() {
-  if (!activeFile.preAllocate(LOG_FILE_SIZE)) {
-    Serial.println("preAllocate failed\n");
+  if (!activeFile.open(filename, O_RDWR | O_CREAT | O_TRUNC)) {
+    SERIAL_USB.println("open failed");
+    return 1;
+  }
+  if (!activeFile.preAllocate((uint64_t) LOG_FILE_SIZE)) {
+    SERIAL_USB.println("preAllocate failed\n");
     activeFile.close();
     return 1;
   }
@@ -39,6 +49,10 @@ void Logger::closeFile() {
   ringBuffer.sync();
   activeFile.truncate();
   activeFile.close();
+}
+
+void Logger::stopLogging() {
+  closeFile();
 }
 
 /**
@@ -58,13 +72,13 @@ void Logger::println(char *line, uint32_t sec, uint32_t us) {
   }
 
   // Flush sector if block device available
-  flushSector();
+  uint8_t ret = flushSector();
 
   ringBuffer.print(String(sec, DEC) + ", " + String(us, DEC) + ": ");
   ringBuffer.println(line);
 }
 
-void Logger::getFilename() { Serial.println(filename); }
+void Logger::getFilename() { SERIAL_USB.println(filename); }
 
 void Logger::setFilename(char *name) { strcpy(filename, name); }
 
