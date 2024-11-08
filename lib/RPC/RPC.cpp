@@ -8,6 +8,8 @@ RadioReceiver::RadioReceiver() {
     rxState = WAIT_SOF;
 };
 
+//TODO: implement timeout in-case basestation drops comms mid transmit
+
 // Co-routine to recieve UART data from the radio
 void RadioReceiver::parseFrame(char byte) {
     switch(rxState) {

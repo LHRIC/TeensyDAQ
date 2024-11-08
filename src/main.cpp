@@ -95,35 +95,17 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
     {fl_adc3.getChannelId(), fl_adc3},
     {fl_adc4.getChannelId(), fl_adc4}};
 
+volatile uint8_t lastDatalogSwitchState = 1;
+volatile uint8_t datalogSwitchState = 1;
+volatile bool datalogFallingEdgeDetected = false;
+volatile bool datalogRisingEdgeDetected = false;
+
+volatile bool isLogging = false;
+
+String filename;
+volatile int32_t unixEpoch;
+
 // Thread Co-routines
-void readRadioCommands() {
-  while (1) {
-    // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
-    char commandBuffer[10] = {0};
-    bool hadBytesToRead = false;
-    while (SERIAL_XBEE.available()) {
-      SERIAL_XBEE.readBytesUntil('\n', commandBuffer, 10);
-      hadBytesToRead = true;
-    }
-    if (hadBytesToRead) {
-      SERIAL_USB.println("Recv: " + String(commandBuffer));
-    }
-
-    // Do whatever with the buffer
-    CAN_message_t msg;
-    msg.id = (commandBuffer[0] << 8) | commandBuffer[1];
-    msg.len = 8;
-    for (int i = 0; i < msg.len; i++) {
-      msg.buf[i] = commandBuffer[i + 2];
-    }
-
-    Can0.write(msg);
-
-    // Yield to the next thread
-    threads.yield();
-  }
-}
-
 void transmitCANData() {
   while (1) {
     for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
@@ -146,48 +128,21 @@ void transmitCANData() {
 }
 
 void writeSDCardData() {
+  uint8_t ledState = HIGH;
   while (1) {
-    char output[1024] = {0};
+    if(isLogging) {
+      digitalWrite(LED_PIN, ledState);
+      ledState = !ledState;
+      char output[1024] = {0};
 
-    serializeJson(doc, output);
+      serializeJson(doc, output);
 
-    // Serialize data and send that bitch
-    sdCard.println(output, epoch, nanos / 1000);
-
-    threads.delay(100);
-  }
-}
-
-void rxUART() {
-  while (1) {
-    // Default timeout is 1000ms, change with SERIAL_XBEE.setTimeout()
-    char dataBuf[100] = {0};
-
-    while (SERIAL_XBEE.available()) {
-      char SOFBuf[8] = {0};
-      SERIAL_XBEE.readBytesUntil(SOF_BYTE, SOFBuf, 8);
-      SERIAL_USB.println("SOF Detected");
-
-      char dataLenBuf[2] = {0};
-      SERIAL_XBEE.readBytes(dataLenBuf, 2);
-      uint16_t dataLen = (uint16_t) (dataLenBuf[0] << 8) | dataLenBuf[1];
-      SERIAL_USB.print("Len: ");
-      SERIAL_USB.print(dataLen);
-      SERIAL_USB.println();
-
-      if(dataLen > 0) {
-        SERIAL_XBEE.readBytes(dataBuf, dataLen);
-        SERIAL_USB.print("Data: ");
-        SERIAL_USB.print(String(dataBuf));
-        SERIAL_USB.println();
-
-        char EOFBuf[8] = {0};
-        SERIAL_XBEE.readBytesUntil(EOF_BYTE, EOFBuf, 8);
-      }
+      // Serialize data and send that bitch
+      SERIAL_USB.println("Writing SD Data");
+      sdCard.println(output, epoch, nanos / 1000);
     }
-
-    // Yield to the next thread
-    threads.yield();
+    // Log CAN map to sdCard every 100ms.
+    threads.delay(100);
   }
 }
 
@@ -204,6 +159,44 @@ void handleRXing() {
     } else {
       threads.yield();
     }
+  }
+}
+
+void monitorDatalogSwitch() {
+  while(1) {
+    datalogSwitchState = digitalRead(DATALOG_PIN);
+    
+    if(datalogSwitchState == 0 && lastDatalogSwitchState == 1) {
+      datalogFallingEdgeDetected = true;
+      datalogRisingEdgeDetected = false;
+      // Start datalogging
+      if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
+        // Failed GPS Init in time
+        filename = "log_millis_" + String(millis()) + ".txt";
+      } else {
+        // Get the current time in Unix Epoch format
+        unixEpoch = gnssModule.getUnixEpoch();
+        filename = "log_epoch_" + String(unixEpoch) + ".txt";
+      }
+
+      sdCard.setFilename((char *)filename.c_str());
+      SERIAL_USB.print("Starting log:");
+      SERIAL_USB.println(filename);
+      sdCard.startLogging();
+      isLogging = true;
+    } else if (datalogSwitchState == 1 && lastDatalogSwitchState == 0) {
+      datalogFallingEdgeDetected = false;
+      datalogRisingEdgeDetected = true;
+      SERIAL_USB.println("Stopping logger");
+      // Stop datalogging
+      sdCard.stopLogging();
+      isLogging = false;
+    } else {
+      datalogFallingEdgeDetected = false;
+      datalogRisingEdgeDetected = false;
+    }
+    lastDatalogSwitchState = datalogSwitchState;    
+    threads.delay(100);
   }
 }
 
@@ -298,27 +291,13 @@ void setupCANBus() {
   Can0.enableFIFOInterrupt();
   Can0.onReceive(onCANMessageCallback);
 
-  Can0.mailboxStatus();
+  //Can0.mailboxStatus();
 }
 
 void setupSDCard() {
   uint8_t sdInitStatus = sdCard.initialize();
-  String filename;
-  int32_t unixEpoch;
   if (sdInitStatus == 0) {
     SERIAL_USB.println("SD Card initialized successfully");
-
-    if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
-      // Failed GPS Init in time
-      filename = "log_" + String(millis()) + ".txt";
-    } else {
-      // Get the current time in Unix Epoch format
-      unixEpoch = gnssModule.getUnixEpoch();
-      filename = "log_" + String(unixEpoch) + ".txt";
-    }
-
-    sdCard.setFilename((char *)filename.c_str());
-    sdCard.startLogging();
   } else {
     SERIAL_USB.println("SD Card initialization failed");
   }
@@ -327,7 +306,7 @@ void setupSDCard() {
 void setup(void) {
   // Setup GPIO
   pinMode(LED_PIN, OUTPUT);
-  pinMode(DATALOG_PIN, INPUT_PULLDOWN);
+  pinMode(DATALOG_PIN, INPUT);
   digitalWrite(LED_PIN, HIGH);
 
   // UART Channel Setup
@@ -341,14 +320,22 @@ void setup(void) {
   setupGPS();
   waitForGPSFix(GPS_INITIALIZE_TIMEOUT_MS);
 
-  //setupSDCard();
+  setupSDCard();
 
   setupCANBus();
 
   // Dispatch threads
-  //threads.addThread(readRadioCommands);
+  //threads.addThread(handleRXing);
+  
   threads.addThread(transmitCANData);
-  //threads.addThread(writeSDCardData);
+  threads.addThread(monitorDatalogSwitch);
+  
+  // Allocate 4MB of stack memory for this thread.
+  // Any less and you risk causing a stack overflow, 
+  // which will cause the Teensy to hard fault.
+  //
+  // Don't ask me how I know...
+  threads.addThread(writeSDCardData, 0, 4096);
 
   threads.addThread(handleRXing);
 
