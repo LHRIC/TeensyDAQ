@@ -37,7 +37,7 @@ int32_t alt;
 
 DynamicJsonDocument doc(2048);
 
-Logger sdCard = Logger();
+Logger sdCard;
 
 RadioReceiver xBee = RadioReceiver();
 
@@ -56,18 +56,18 @@ Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
 Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
 Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
 Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
-Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, true);
-Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, true);
-Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, true);
-Channel fl_adc4 = Channel(0x404, 100, 6, 7, 1, 0, "fl_adc4", false, true);
-Channel fr_adc1 = Channel(0x401, 100, 0, 1, 1, 0, "fr_adc1", false, true);
-Channel fr_adc2 = Channel(0x401, 100, 2, 3, 1, 0, "fr_adc2", false, true);
-Channel fr_adc3 = Channel(0x401, 100, 4, 5, 1, 0, "fr_adc3", false, true);
-Channel fr_adc4 = Channel(0x401, 100, 6, 7, 1, 0, "fr_adc4", false, true);
-Channel rr_adc1 = Channel(0x402, 100, 0, 1, 1, 0, "rr_adc1", false, true);
-Channel rr_adc2 = Channel(0x402, 100, 2, 3, 1, 0, "rr_adc2", false, true);
-Channel rr_adc3 = Channel(0x402, 100, 4, 5, 1, 0, "rr_adc3", false, true);
-Channel rr_adc4 = Channel(0x402, 100, 6, 7, 1, 0, "rr_adc4", false, true);
+Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, false);
+Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, false);
+Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, false);
+Channel fl_adc4 = Channel(0x404, 100, 6, 7, 1, 0, "fl_adc4", false, false);
+Channel fr_adc1 = Channel(0x401, 100, 0, 1, 1, 0, "fr_adc1", false, false);
+Channel fr_adc2 = Channel(0x401, 100, 2, 3, 1, 0, "fr_adc2", false, false);
+Channel fr_adc3 = Channel(0x401, 100, 4, 5, 1, 0, "fr_adc3", false, false);
+Channel fr_adc4 = Channel(0x401, 100, 6, 7, 1, 0, "fr_adc4", false, false);
+Channel rr_adc1 = Channel(0x402, 100, 0, 1, 1, 0, "rr_adc1", false, false);
+Channel rr_adc2 = Channel(0x402, 100, 2, 3, 1, 0, "rr_adc2", false, false);
+Channel rr_adc3 = Channel(0x402, 100, 4, 5, 1, 0, "rr_adc3", false, false);
+Channel rr_adc4 = Channel(0x402, 100, 6, 7, 1, 0, "rr_adc4", false, false);
 
 std::unordered_multimap<uint16_t, Channel> channelMap = {
     {rpm_c.getChannelId(), rpm_c},
