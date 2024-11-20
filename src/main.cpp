@@ -53,9 +53,23 @@ Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa", false, false);
 Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
 
 // CAN board channels
+
+// CG
 Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
 Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
 Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
+Channel cg_gyro_x = Channel(0x406, 60, 0, 1, 256.0, 0, "cg_gyro_x", true, true);
+Channel cg_gyro_y = Channel(0x406, 60, 2, 3, 256.0, 0, "cg_gyro_y", true, true);
+Channel cg_gyro_z = Channel(0x406, 60, 4, 5, 256.0, 0, "cg_gyro_z", true, true);
+Channel cg_lin_accel_x = Channel(0x407, 60, 0, 1, 256.0, 0, "cg_lin_accel_x", true, true);
+Channel cg_lin_accel_y = Channel(0x407, 60, 2, 3, 256.0, 0, "cg_lin_accel_y", true, true);
+Channel cg_lin_accel_z = Channel(0x407, 60, 4, 5, 256.0, 0, "cg_lin_accel_z", true, true);
+Channel cg_rot_i = Channel(0x408, 60, 0, 1, 256.0, 0, "cg_rot_i", true, true);
+Channel cg_rot_j = Channel(0x408, 60, 2, 3, 256.0, 0, "cg_rot_j", true, true);
+Channel cg_rot_k = Channel(0x408, 60, 4, 5, 256.0, 0, "cg_rot_k", true, true);
+Channel cg_rot_real = Channel(0x408, 60, 6, 7, 256.0, 0, "cg_rot_real", true, true);
+
+// ADC
 Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, false);
 Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, false);
 Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, false);
@@ -82,6 +96,16 @@ std::unordered_multimap<uint16_t, Channel> channelMap = {
     {cg_accel_x.getChannelId(), cg_accel_x},
     {cg_accel_y.getChannelId(), cg_accel_y},
     {cg_accel_z.getChannelId(), cg_accel_z},
+    {cg_gyro_x.getChannelId(), cg_gyro_x},
+    {cg_gyro_y.getChannelId(), cg_gyro_y},
+    {cg_gyro_z.getChannelId(), cg_gyro_z},
+    {cg_lin_accel_x.getChannelId(), cg_lin_accel_x},
+    {cg_lin_accel_y.getChannelId(), cg_lin_accel_y},
+    {cg_lin_accel_z.getChannelId(), cg_lin_accel_z},
+    {cg_rot_i.getChannelId(), cg_rot_i},
+    {cg_rot_j.getChannelId(), cg_rot_j},
+    {cg_rot_k.getChannelId(), cg_rot_k},
+    {cg_rot_real.getChannelId(), cg_rot_real},
     {fr_adc1.getChannelId(), fr_adc1},
     {fr_adc2.getChannelId(), fr_adc2},
     {fr_adc3.getChannelId(), fr_adc3},
