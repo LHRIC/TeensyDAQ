@@ -1,25 +1,37 @@
 #include <Arduino.h>
-#include <SD.h>
+#include <SdFat.h>
+#include <RingBuf.h>
 
 #ifndef SRC_LOGGER_H_
 #define SRC_LOGGER_H_
+
+#define SD_CONFIG SdioConfig(FIFO_SDIO)
+#define RING_BUF_CAPACITY 100000
+
+// Estimated: 20 byte lines at 100Khz for 60 minutes
+#define LOG_FILE_SIZE 20 * 100000 * 60
+
+#define SECTOR_SIZE 512
 
 class Logger {
     public:
         Logger();
 
-        uint8_t Logger::initialize();
-        void Logger::startLogging();
-        void Logger::println(char* line);
-        void Logger::println(char* line, uint32_t sec, uint32_t us);
-        void Logger::getFilename();
-        void Logger::setFilename(char* name);
+        uint8_t initialize();
+        void startLogging();
+        void stopLogging();
+        void println(char* line, uint32_t sec, uint32_t us);
+        void getFilename();
+        void setFilename(char* name);
+        uint8_t flushSector();
     private:
         String line;
-        File activeFile;
+        FsFile activeFile;
+        SdFs sdCard;
+        RingBuf<FsFile, RING_BUF_CAPACITY> ringBuffer;
         char filename[100];
-        void Logger::openFile();
-        void Logger::closeFile();
+        uint8_t openFile();
+        void closeFile();
 };
 
 #endif

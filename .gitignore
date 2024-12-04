@@ -8,3 +8,10 @@
 # Clangd
 .cache
 compile_commands.json
+.clang-format
+
+#venv
+.env/
+env/
+.venv/
+venv/
