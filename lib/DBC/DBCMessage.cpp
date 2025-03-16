@@ -1,0 +1,63 @@
+#include "DBCMessage.h"
+
+/**
+ * Constructor for the DBCMessage class.
+ * @param name The name of the message
+ * @param id The message ID
+ * @param dlc The message length in bytes
+ */
+DBCMessage::DBCMessage(uint32_t id, const std::string &name, uint8_t dlc)
+    : id(id), name(name), dlc(dlc) {}
+
+/**
+ * Adds a signal to the message.
+ * @param signal The signal to add
+ */
+void DBCMessage::addSignal(const DBCSignal &signal) { signals.push_back(signal); }
+
+/**
+ * Process a message and extract the signal values.
+ * @param data The raw message data
+ */
+void DBCMessage::processMessage(const uint8_t *data) {
+    // Get multiplexor if exists
+    uint8_t multiplexValue = 0;
+    const DBCSignal *multiplexor = getMultiplexorSignal();
+    if (multiplexor) {
+        multiplexValue = multiplexor->extractMultiplexorValue(data);
+    }
+
+    // Process all active signals
+    std::vector<DBCSignal *> activeSignals = getActiveSignals(multiplexValue);
+
+    for (auto &signal : activeSignals) {
+        signal->processMessage(data);
+    }
+}
+
+/**
+ * Find the multiplexor signal if any.
+ * @return The multiplexor signal or nullptr if none exists
+ */
+const DBCSignal *DBCMessage::getMultiplexorSignal() const {
+    for (const auto &signal : signals) {
+        if (signal.isMultiplexorSignal()) {
+            return &signal;
+        }
+    }
+    return nullptr;
+}
+
+/**
+ * Get all signals active for a specific multiplexor value.
+ * @param multiplexValue The multiplexor value
+ * @return A vector of signals active for the multiplexor value
+ */
+std::vector<DBCSignal *> DBCMessage::getActiveSignals(uint8_t multiplexValue) {
+    std::vector<DBCSignal *> activeSignals;
+    for (auto &signal : signals) {
+        if (signal.isActive(multiplexValue)) {
+            activeSignals.push_back(&signal);
+        }
+    }
+    return activeSignals;
