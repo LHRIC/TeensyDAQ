@@ -17,7 +17,7 @@ public:
   const std::vector<DBCSignal>& getSignals() const { return signals; }
   
   // Find the multiplexor signal if any
-  const DBCSignal* getMultiplexorSignal() const;
+  const DBCSignal* getMultiplexorSignal();
   
   // Get all signals active for a specific multiplexor value
   std::vector<DBCSignal*> getActiveSignals(uint8_t multiplexValue);

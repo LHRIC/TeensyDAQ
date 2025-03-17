@@ -1,88 +1,16 @@
-#include <Channel.h>
+#include "Channel.h"
 
-Channel::Channel(){};
+Channel::Channel(DBCSignal *signal, const DBCMessage *message, const std::string displayName,
+                 bool log, bool logRaw, bool radioTransmit)
+    : signal(signal), message(message), displayName(displayName), logEnabled(log),
+      logRawEnabled(logRaw), radioTransmitEnabled(radioTransmit) {}
 
-Channel::Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, 
-                    double DivisorScalar, double AdditiveScalar, std::string Name, bool IsSigned, bool LittleEndian) {
-    channelId = ChannelId;
-    sampleRate = SampleRate;
-    startBit = StartBit;
-    endBit = EndBit;
-
-    numBytes = EndBit - StartBit + 1;
-
-    divisorScalar = DivisorScalar;
-    additiveScalar = AdditiveScalar;
-
-    name = Name;
-    isSigned = IsSigned;
-    littleEndian = LittleEndian;
+void Channel::processMessage(const uint8_t *data) {
+  if (signal) {
+    signal->processMessage(data);
+  }
 }
 
-uint16_t Channel::getValue(){
-    return value;
+bool Channel::isActiveForMultiplexValue(uint8_t multiplexValue) const {
+  return signal ? signal->isActive(multiplexValue) : false;
 }
-
-int16_t Channel::getSignedValue() {
-    return static_cast<int16_t>(value);
-}
-
-// void Channel::setValue(const uint8_t* buf) {
-//     // Assumes 16 bit Big Endian encoded data.
-//     // Change to a more robust system later
-//     if(startBit == endBit) {
-//         value = buf[startBit];
-//     } else {
-//         value = (buf[startBit] << 8) | buf[endBit];
-//     }
-//     //Serial.println(value);
-// }
-
-void Channel::setValue(const uint8_t* buf) {
-    int16_t tempValue = 0;
-
-    if (startBit == endBit) {
-        tempValue = buf[startBit];
-    } else {
-        if (littleEndian) {
-            tempValue = (buf[endBit] << 8) | buf[startBit];
-        } else {
-            tempValue = (buf[startBit] << 8) | buf[endBit];
-        }
-    }
-
-    if (isSigned) {
-        value = static_cast<int16_t>(tempValue);
-    } else {
-        value = static_cast<uint16_t>(tempValue);
-    }
-}
-
-double Channel::getScaledValue() {
-    return scaledValue;
-}
-
-void Channel::setScaledValue() {
-    if (isSigned) {
-        scaledValue = static_cast<double>((static_cast<int16_t>(value) / divisorScalar) + additiveScalar);
-    } else {
-        scaledValue = static_cast<double>((value / divisorScalar) + additiveScalar);
-    }
-}
-
-void Channel::setScaledValue(double value) {
-    scaledValue = value;
-}
-
-uint16_t Channel::getChannelId() {
-    return channelId;
-}
-
-std::string Channel::getName() {
-    return name;
-}
-
-bool Channel::getIsSigned() {
-    return isSigned;
-}
-

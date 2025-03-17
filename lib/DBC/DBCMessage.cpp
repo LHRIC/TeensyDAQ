@@ -39,8 +39,8 @@ void DBCMessage::processMessage(const uint8_t *data) {
  * Find the multiplexor signal if any.
  * @return The multiplexor signal or nullptr if none exists
  */
-const DBCSignal *DBCMessage::getMultiplexorSignal() const {
-    for (const auto &signal : signals) {
+const DBCSignal *DBCMessage::getMultiplexorSignal() {
+    for (auto &signal : signals) {
         if (signal.isMultiplexorSignal()) {
             return &signal;
         }
@@ -61,3 +61,4 @@ std::vector<DBCSignal *> DBCMessage::getActiveSignals(uint8_t multiplexValue) {
         }
     }
     return activeSignals;
+}

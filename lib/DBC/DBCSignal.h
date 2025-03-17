@@ -18,7 +18,8 @@ public:
   const std::string &getName() const { return name; }
 
   // Multiplexor related methods
-  bool isMultiplexorSignal() const { return isMultiplexor; }
+  bool isMultiplexorSignal() { return isMultiplexor; }
+  bool isMultiplexedSignal() { return isMultiplexed; }
   bool isActive(uint8_t currentMultiplexValue) const;
   uint8_t extractMultiplexorValue(const uint8_t *data) const;
 
@@ -34,9 +35,9 @@ private:
   bool isBigEndian;
 
   // Multiplexer related fields
-  bool isMultiplexor; // True if this signal is a multiplexer
-  bool isMultiplexed; // True if this signal is multiplexed
-  uint8_t multiplexValue; // The value of the multiplexer signal
+  bool isMultiplexor;
+  bool isMultiplexed;
+  uint8_t multiplexValue;
 };
 
 #endif
