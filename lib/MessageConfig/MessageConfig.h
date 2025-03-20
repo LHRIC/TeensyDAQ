@@ -37,7 +37,7 @@ private:
   static std::unordered_map<uint32_t, std::vector<Channel>> 
   buildChannelMap(const std::vector<SignalConfig>& signalConfigs, 
                   const std::unordered_map<std::string, DBCSignal*>& signalsByName,
-                  const std::vector<DBCMessage>& messages);
+                  std::vector<DBCMessage>& messages);
 
   static JsonDocument readJSONFile(const char* filename);
 };

@@ -1,8 +1,8 @@
 #include "ChannelManager.h"
 
-void ChannelManager::addChannel(Channel channel) {
+void ChannelManager::addChannel(Channel &channel) {
   channelMap[channel.getMessage()->getId()].push_back(channel);
-  channelsByName[channel.getName()] = &channel;
+  channelsByName[channel.getName()] = &channelMap[channel.getMessage()->getId()].back();
 }
 
 void ChannelManager::processCANMessage(uint32_t id, const uint8_t *data) {
@@ -15,7 +15,7 @@ void ChannelManager::processCANMessage(uint32_t id, const uint8_t *data) {
   }
 }
 
-const std::vector<Channel> &ChannelManager::getChannelsForId(uint32_t id) const {
+const std::vector<Channel> ChannelManager::getChannelsForId(uint32_t id) const {
   auto it = channelMap.find(id);
   if (it == channelMap.end())
     return emptyVector;
@@ -23,21 +23,21 @@ const std::vector<Channel> &ChannelManager::getChannelsForId(uint32_t id) const 
   return it->second;
 }
 
-std::vector<Channel *> ChannelManager::getLoggableChannels() {
-  std::vector<Channel *> loggableChannels;
+std::vector<Channel> ChannelManager::getLoggableChannels() {
+  std::vector<Channel> loggableChannels;
   for (auto &channelPair : channelsByName) {
     if (channelPair.second->isLoggingEnabled()) {
-      loggableChannels.push_back(channelPair.second);
+      loggableChannels.push_back(*channelPair.second);
     }
   }
   return loggableChannels;
 }
 
-std::vector<Channel *> ChannelManager::getRadioTransmitChannels() {
-  std::vector<Channel *> radioTransmitChannels;
+std::vector<Channel> ChannelManager::getRadioTransmitChannels() {
+  std::vector<Channel> radioTransmitChannels;
   for (auto &channelPair : channelsByName) {
     if (channelPair.second->isRadioTransmitEnabled()) {
-      radioTransmitChannels.push_back(channelPair.second);
+      radioTransmitChannels.push_back(*channelPair.second);
     }
   }
   return radioTransmitChannels;

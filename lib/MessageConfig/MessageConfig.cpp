@@ -48,6 +48,7 @@ MessageConfigParser::parseDBCFile(const char *dbcFilename) {
   // Parse DBC JSON file
   JsonDocument dbcDoc = readJSONFile(dbcFilename);
   if (dbcDoc.isNull()) {
+    Serial.println("Failed to parse DBC file");
     return {dbcMessages, signalsByName};
   }
 
@@ -90,13 +91,14 @@ MessageConfigParser::parseDBCFile(const char *dbcFilename) {
       dbcSignals.emplace_back(sigName, startBit, length, scale, offset, isSigned, isBigEndian,
                               isMultiplexor, isMultiplexed, multiplexValue);
       DBCSignal *signal = &dbcSignals.back();
-      message->addSignal(*signal);
+      message->addSignal(signal);
 
       // Store signal by name for quick lookup
       signalsByName[sigName] = signal;
     }
   }
 
+  Serial.println("Successfully parsed DBC file");
   return {dbcMessages, signalsByName};
 }
 
@@ -123,20 +125,21 @@ MessageConfigParser::parseSignalConfigFile(const char *signalConfigFilename) {
     signalConfigs.push_back(sigConfig);
   }
 
+  Serial.println("Successfully parsed signal config file");
   return signalConfigs;
 }
 
 std::unordered_map<uint32_t, std::vector<Channel>> MessageConfigParser::buildChannelMap(
     const std::vector<SignalConfig> &signalConfigs,
     const std::unordered_map<std::string, DBCSignal *> &signalsByName,
-    const std::vector<DBCMessage> &messages) {
+    std::vector<DBCMessage> &messages) {
   std::unordered_map<uint32_t, std::vector<Channel>> channelMap;
 
   // Create a map from signal to message for quicker lookups
   std::unordered_map<DBCSignal *, const DBCMessage *> signalToMessage;
-  for (const auto &message : messages) {
-    for (DBCSignal signal : message.getSignals()) {
-      signalToMessage[&signal] = &message;
+  for (auto &message : messages) {
+    for (DBCSignal* signal : message.getSignals()) {
+      signalToMessage[signal] = &message;
     }
   }
 
@@ -169,5 +172,6 @@ std::unordered_map<uint32_t, std::vector<Channel>> MessageConfigParser::buildCha
     channelMap[canId].push_back(channel);
   }
 
+  Serial.println("Successfully built channel map");
   return channelMap;
 }

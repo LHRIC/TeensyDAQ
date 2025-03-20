@@ -23,6 +23,9 @@
 #define GPS_INITIALIZE_TIMEOUT_MS 5000
 #define GPS_I2C_CLOCK 400E3
 
+#define DBC_FILEPATH "/LHRDB.json"
+#define SIGNAL_CONFIG_FILEPATH "/signalConfig.json"
+
 ThreadWrap(Serial, serialUsbThreadSafe)
 #define SERIAL_USB ThreadClone(serialUsbThreadSafe)
 
@@ -60,19 +63,18 @@ ChannelManager channelManager;
 void transmitCANData() {
   while (1) {
     // Get all transmitting channels
-    std::vector<Channel *> radioTransmitChannels = channelManager.getRadioTransmitChannels();
-    for (auto it = radioTransmitChannels.begin(); it != radioTransmitChannels.end(); it++) {
-      Channel *curChannel = *it;
-      std::string name = ">" + curChannel->getName() + ":";
+    std::vector<Channel> radioTransmitChannels = channelManager.getRadioTransmitChannels();
+    for (auto &curChannel : radioTransmitChannels) {
+      std::string name = ">" + curChannel.getName() + ":";
 
       SERIAL_XBEE.print(name.c_str());
-      SERIAL_XBEE.println(curChannel->getScaledValue());
+      SERIAL_XBEE.println(curChannel.getScaledValue());
 
       // Send raw data if enabled
-      if (curChannel->isRawLoggingEnabled()) {
-        std::string rawName = ">" + curChannel->getName() + "_raw:";
+      if (curChannel.isRawLoggingEnabled()) {
+        std::string rawName = ">" + curChannel.getName() + "_raw:";
         SERIAL_XBEE.print(rawName.c_str());
-        SERIAL_XBEE.println(curChannel->getRawValue());
+        SERIAL_XBEE.println(curChannel.getRawValue());
       }
     }
 
@@ -191,13 +193,16 @@ void onCANMessageCallback(const CAN_message_t &msg) {
   // Log signals in the message
   if (isLogging) {
     std::vector<Channel> channels = channelManager.getChannelsForId(msg.id);
-    for (auto it = channels.begin(); it != channels.end(); it++) {
-      Channel curChannel = *it;
+    for (auto &curChannel : channels) {
       std::string name = curChannel.getName();
       double value = curChannel.getScaledValue();
       double rawValue = curChannel.getRawValue();
 
       doc[name.c_str()] = value;
+
+      SERIAL_USB.print(name.c_str());
+      SERIAL_USB.print(": ");
+      SERIAL_USB.println(value);
 
       // Log raw data if enabled
       if (curChannel.isRawLoggingEnabled()) {
@@ -275,7 +280,7 @@ void setupSDCard() {
 void setupChannels() {
   // Load channel map from JSON files
   std::unordered_map<uint32_t, std::vector<Channel>> channelMap =
-      MessageConfigParser::getChannelMap("/signal_config.json", "/dbc.json");
+      MessageConfigParser::getChannelMap(SIGNAL_CONFIG_FILEPATH, DBC_FILEPATH);
 
   // Add channels to the channel manager
   for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
@@ -312,7 +317,6 @@ void setup(void) {
 
   // Dispatch threads
   // threads.addThread(handleRXing);
-
   threads.addThread(transmitCANData);
   threads.addThread(monitorDatalogSwitch);
 
@@ -322,8 +326,6 @@ void setup(void) {
   //
   // Don't ask me how I know...
   threads.addThread(writeSDCardData, 0, 4096);
-
-  threads.addThread(handleRXing);
 
   digitalWrite(LED_PIN, LOW);
 }

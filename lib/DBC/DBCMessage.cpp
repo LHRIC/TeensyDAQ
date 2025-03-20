@@ -13,7 +13,7 @@ DBCMessage::DBCMessage(uint32_t id, const std::string &name, uint8_t dlc)
  * Adds a signal to the message.
  * @param signal The signal to add
  */
-void DBCMessage::addSignal(const DBCSignal &signal) { signals.push_back(signal); }
+void DBCMessage::addSignal(DBCSignal* signal) { signals.push_back(signal); }
 
 /**
  * Process a message and extract the signal values.
@@ -41,8 +41,8 @@ void DBCMessage::processMessage(const uint8_t *data) {
  */
 const DBCSignal *DBCMessage::getMultiplexorSignal() {
     for (auto &signal : signals) {
-        if (signal.isMultiplexorSignal()) {
-            return &signal;
+        if (signal->isMultiplexorSignal()) {
+            return signal;
         }
     }
     return nullptr;
@@ -56,8 +56,8 @@ const DBCSignal *DBCMessage::getMultiplexorSignal() {
 std::vector<DBCSignal *> DBCMessage::getActiveSignals(uint8_t multiplexValue) {
     std::vector<DBCSignal *> activeSignals;
     for (auto &signal : signals) {
-        if (signal.isActive(multiplexValue)) {
-            activeSignals.push_back(&signal);
+        if (signal->isActive(multiplexValue)) {
+            activeSignals.push_back(signal);
         }
     }
     return activeSignals;

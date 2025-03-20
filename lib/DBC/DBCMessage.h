@@ -9,12 +9,12 @@
 class DBCMessage {
 public:
   DBCMessage(uint32_t id, const std::string &name, uint8_t dlc);
-  void addSignal(const DBCSignal &signal);
+  void addSignal(DBCSignal* signal);
   void processMessage(const uint8_t *data);
   
   uint32_t getId() const { return id; }
   const std::string& getName() const { return name; }
-  const std::vector<DBCSignal>& getSignals() const { return signals; }
+  std::vector<DBCSignal*> getSignals() { return signals; }
   
   // Find the multiplexor signal if any
   const DBCSignal* getMultiplexorSignal();
@@ -26,7 +26,7 @@ private:
   uint32_t id;
   std::string name;
   uint8_t dlc;  // Data Length Code
-  std::vector<DBCSignal> signals;
+  std::vector<DBCSignal*> signals;
 };
 
 #endif
