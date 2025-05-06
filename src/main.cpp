@@ -61,28 +61,49 @@ ChannelManager channelManager;
 
 // Thread Co-routines
 void transmitCANData() {
+  JsonDocument transmitDoc;
+
   while (1) {
     // Get all transmitting channels
     std::vector<Channel *> radioTransmitChannels = channelManager.getRadioTransmitChannels();
+
     for (auto &curChannel : radioTransmitChannels) {
-      std::string name = ">" + curChannel->getName() + ":";
+      // std::string name = ">" + curChannel->getName() + ":";
 
-      SERIAL_XBEE.print(name.c_str());
-      SERIAL_XBEE.println(curChannel->getScaledValue());
+      // SERIAL_XBEE.print(name.c_str());
+      // SERIAL_XBEE.println(curChannel->getScaledValue());
 
-      // Send raw data if enabled
+      // // Send raw data if enabled
+      // if (curChannel->isRawLoggingEnabled()) {
+      //   std::string rawName = ">" + curChannel->getName() + "_raw:";
+      //   SERIAL_XBEE.print(rawName.c_str());
+      //   SERIAL_XBEE.println(curChannel->getRawValue());
+      // }
+
+      // Add to JSON document
+      std::string name = curChannel->getName();
+      double value = curChannel->getScaledValue();
+      double rawValue = curChannel->getRawValue();
+
+      transmitDoc[name.c_str()] = value;
+
+      // Log raw data if enabled
       if (curChannel->isRawLoggingEnabled()) {
-        std::string rawName = ">" + curChannel->getName() + "_raw:";
-        SERIAL_XBEE.print(rawName.c_str());
-        SERIAL_XBEE.println(curChannel->getRawValue());
+        std::string rawName = name + "_raw";
+        transmitDoc[rawName.c_str()] = rawValue;
       }
     }
 
-    // Send GPS separately since it's not a CAN channel
-    SERIAL_XBEE.print(">lat:");
-    SERIAL_XBEE.println((float)doc["lat"]);
-    SERIAL_XBEE.print(">long:");
-    SERIAL_XBEE.println((float)doc["lon"]);
+    // Add GPS data to JSON document
+    transmitDoc["lat"] = lat;
+    transmitDoc["lon"] = lon;
+    transmitDoc["alt"] = alt;
+    transmitDoc["epoch"] = epoch;
+    transmitDoc["nanos"] = nanos;
+
+    // Serialize and send the JSON document
+    serializeJson(transmitDoc, SERIAL_XBEE);
+    SERIAL_XBEE.println();
 
     // Yield to next thread
     threads.yield();
