@@ -12,11 +12,11 @@
 #include <DBCMessage.h>
 #include <DBCSignal.h>
 #include <Logger.h>
-#include <MessageConfig.h>
 #include <RPC.h>
+#include <SignalConfig.h>
 
 #define LED_PIN 13
-#define DATALOG_PIN 40
+#define DATALOG_PIN 2
 
 #define SERIAL_USB_BAUDRATE 115200
 #define SERIAL_XBEE_BAUDRATE 115200
@@ -24,12 +24,12 @@
 #define GPS_I2C_CLOCK 400E3
 
 #define DBC_FILEPATH "/LHRDB.json"
-#define SIGNAL_CONFIG_FILEPATH "/signalConfig.json"
+#define SIGNAL_CONFIG_FILEPATH "/SignalConfig.json"
 
 ThreadWrap(Serial, serialUsbThreadSafe)
 #define SERIAL_USB ThreadClone(serialUsbThreadSafe)
 
-    ThreadWrap(Serial2, serialXbeeThreadSafe)
+    ThreadWrap(Serial1, serialXbeeThreadSafe)
 #define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
 
         FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0;
@@ -63,18 +63,18 @@ ChannelManager channelManager;
 void transmitCANData() {
   while (1) {
     // Get all transmitting channels
-    std::vector<Channel> radioTransmitChannels = channelManager.getRadioTransmitChannels();
+    std::vector<Channel *> radioTransmitChannels = channelManager.getRadioTransmitChannels();
     for (auto &curChannel : radioTransmitChannels) {
-      std::string name = ">" + curChannel.getName() + ":";
+      std::string name = ">" + curChannel->getName() + ":";
 
       SERIAL_XBEE.print(name.c_str());
-      SERIAL_XBEE.println(curChannel.getScaledValue());
+      SERIAL_XBEE.println(curChannel->getScaledValue());
 
       // Send raw data if enabled
-      if (curChannel.isRawLoggingEnabled()) {
-        std::string rawName = ">" + curChannel.getName() + "_raw:";
+      if (curChannel->isRawLoggingEnabled()) {
+        std::string rawName = ">" + curChannel->getName() + "_raw:";
         SERIAL_XBEE.print(rawName.c_str());
-        SERIAL_XBEE.println(curChannel.getRawValue());
+        SERIAL_XBEE.println(curChannel->getRawValue());
       }
     }
 
@@ -93,8 +93,10 @@ void writeSDCardData() {
   uint8_t ledState = HIGH;
   while (1) {
     if (isLogging) {
+      // Pulse LED to indicate logging
       digitalWrite(LED_PIN, ledState);
       ledState = !ledState;
+
       char output[1024] = {0};
 
       serializeJson(doc, output);
@@ -125,40 +127,33 @@ void handleRXing() {
 }
 
 void monitorDatalogSwitch() {
-  while (1) {
-    datalogSwitchState = digitalRead(DATALOG_PIN);
+  // Switch is pulled high, so we need to check for falling edge
+  // to detect when the switch is pressed
 
-    if (datalogSwitchState == 0 && lastDatalogSwitchState == 1) {
-      datalogFallingEdgeDetected = true;
-      datalogRisingEdgeDetected = false;
-      // Start datalogging
-      if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
-        // Failed GPS Init in time
-        filename = "log_millis_" + String(millis()) + ".txt";
-      } else {
-        // Get the current time in Unix Epoch format
-        unixEpoch = gnssModule.getUnixEpoch();
-        filename = "log_epoch_" + String(unixEpoch) + ".txt";
-      }
+  // 1 = Rising edge, 0 = Falling edge
+  datalogSwitchState = digitalRead(DATALOG_PIN);
 
-      sdCard.setFilename((char *)filename.c_str());
-      SERIAL_USB.print("Starting log:");
-      SERIAL_USB.println(filename);
-      sdCard.startLogging();
-      isLogging = true;
-    } else if (datalogSwitchState == 1 && lastDatalogSwitchState == 0) {
-      datalogFallingEdgeDetected = false;
-      datalogRisingEdgeDetected = true;
-      SERIAL_USB.println("Stopping logger");
-      // Stop datalogging
-      sdCard.stopLogging();
-      isLogging = false;
+  if (datalogSwitchState == 0 && isLogging == false) {
+    // Start datalogging
+    if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
+      // Failed GPS Init in time
+      filename = "log_millis_" + String(millis()) + ".txt";
     } else {
-      datalogFallingEdgeDetected = false;
-      datalogRisingEdgeDetected = false;
+      // Get the current time in Unix Epoch format
+      unixEpoch = gnssModule.getUnixEpoch();
+      filename = "log_epoch_" + String(unixEpoch) + ".txt";
     }
-    lastDatalogSwitchState = datalogSwitchState;
-    threads.delay(100);
+
+    sdCard.setFilename((char *)filename.c_str());
+    SERIAL_USB.print("Starting log:");
+    SERIAL_USB.println(filename);
+    sdCard.startLogging();
+    isLogging = true;
+  } else if (datalogSwitchState == 1 && isLogging == true) {
+    SERIAL_USB.println("Stopping logger");
+    // Stop datalogging
+    sdCard.stopLogging();
+    isLogging = false;
   }
 }
 
@@ -192,20 +187,17 @@ void onCANMessageCallback(const CAN_message_t &msg) {
 
   // Log signals in the message
   if (isLogging) {
-    std::vector<Channel> channels = channelManager.getChannelsForId(msg.id);
+    std::vector<Channel *> channels = channelManager.getChannelsForId(msg.id);
+
     for (auto &curChannel : channels) {
-      std::string name = curChannel.getName();
-      double value = curChannel.getScaledValue();
-      double rawValue = curChannel.getRawValue();
-
+      std::string name = curChannel->getName();
+      double value = curChannel->getScaledValue();
+      double rawValue = curChannel->getRawValue();
+  
       doc[name.c_str()] = value;
-
-      SERIAL_USB.print(name.c_str());
-      SERIAL_USB.print(": ");
-      SERIAL_USB.println(value);
-
+  
       // Log raw data if enabled
-      if (curChannel.isRawLoggingEnabled()) {
+      if (curChannel->isRawLoggingEnabled()) {
         std::string rawName = name + "_raw";
         doc[rawName.c_str()] = rawValue;
       }
@@ -215,7 +207,8 @@ void onCANMessageCallback(const CAN_message_t &msg) {
 
 // Initial Setup
 void setupGPS() {
-  while (gnssModule.begin() == false) {
+  int startTime = millis();
+  while (gnssModule.begin() == false && (millis() - startTime) < GPS_INITIALIZE_TIMEOUT_MS) {
     SERIAL_USB.println(F("u-blox GNSS not detected at default I2C address. Retrying..."));
     delay(1000);
   }
@@ -254,6 +247,12 @@ void waitForGPSFix(uint32_t msTimeout) {
     SERIAL_USB.println("Waiting for GPS fix...");
     delay(500);
   }
+
+  if (gnssModule.getTimeValid() && gnssModule.getDateValid()) {
+    SERIAL_USB.println("GPS fix acquired!");
+  } else {
+    SERIAL_USB.println("Failed to acquire GPS fix");
+  }
 }
 
 void setupCANBus() {
@@ -279,12 +278,14 @@ void setupSDCard() {
 
 void setupChannels() {
   // Load channel map from JSON files
-  std::unordered_map<uint32_t, std::vector<Channel>> channelMap =
-      MessageConfigParser::getChannelMap(SIGNAL_CONFIG_FILEPATH, DBC_FILEPATH);
+  std::unordered_map<uint32_t, std::vector<Channel *>> channelMap =
+      SignalConfigParser::getChannelMap(SIGNAL_CONFIG_FILEPATH, DBC_FILEPATH);
 
   // Add channels to the channel manager
+  Serial.println("Adding following channels to channel manager");
   for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
-    for (Channel curChannel : it->second) {
+    for (Channel *curChannel : it->second) {
+      Serial.println(curChannel->getName().c_str());
       channelManager.addChannel(curChannel);
     }
   }
@@ -293,7 +294,8 @@ void setupChannels() {
 void setup(void) {
   // Setup GPIO
   pinMode(LED_PIN, OUTPUT);
-  pinMode(DATALOG_PIN, INPUT);
+  pinMode(DATALOG_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(DATALOG_PIN), monitorDatalogSwitch, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
   // UART Channel Setup
@@ -318,7 +320,6 @@ void setup(void) {
   // Dispatch threads
   // threads.addThread(handleRXing);
   threads.addThread(transmitCANData);
-  threads.addThread(monitorDatalogSwitch);
 
   // Allocate 4KB of stack memory for this thread.
   // Any less and you risk causing a stack overflow,

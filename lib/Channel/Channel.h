@@ -8,7 +8,7 @@
 
 class Channel {
 public:
-  Channel(DBCSignal *signal, const DBCMessage *message, const std::string displayName,
+  Channel(DBCSignal *signal, DBCMessage *message, const std::string displayName,
           bool log = true, bool logRaw = false, bool radioTransmit = false);
 
   void processMessage(const uint8_t *data);
@@ -27,7 +27,7 @@ public:
 
 private:
   DBCSignal *signal;
-  const DBCMessage *message;
+  DBCMessage *message;
   std::string displayName;
   bool logEnabled;
   bool logRawEnabled;

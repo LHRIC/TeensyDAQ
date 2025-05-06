@@ -1,18 +1,18 @@
-#include "MessageConfig.h"
+#include "SignalConfig.h"
 
-std::unordered_map<uint32_t, std::vector<Channel>>
-MessageConfigParser::getChannelMap(const char *signalConfigFilename, const char *dbcFilename) {
+std::unordered_map<uint32_t, std::vector<Channel *>>
+SignalConfigParser::getChannelMap(const char *signalConfigFilename, const char *dbcFilename) {
   // First parse DBC JSON file
-  auto [dbcMessages, signalsByName] = parseDBCFile(dbcFilename);
+  std::vector<DBCMessage *> dbcMessages = parseDBCFile(dbcFilename);
 
   // Then get signal configurations
-  auto signalConfigs = parseSignalConfigFile(signalConfigFilename);
+  std::vector<SignalConfig> signalConfigs = parseSignalConfigFile(signalConfigFilename);
 
   // Finally, build the channel map
-  return buildChannelMap(signalConfigs, signalsByName, dbcMessages);
+  return buildChannelMap(signalConfigs, dbcMessages);
 }
 
-JsonDocument MessageConfigParser::readJSONFile(const char *filename) {
+JsonDocument SignalConfigParser::readJSONFile(const char *filename) {
   JsonDocument doc;
 
   SdFs sdCard;
@@ -39,29 +39,32 @@ JsonDocument MessageConfigParser::readJSONFile(const char *filename) {
   return doc;
 }
 
-std::pair<std::vector<DBCMessage>, std::unordered_map<std::string, DBCSignal *>>
-MessageConfigParser::parseDBCFile(const char *dbcFilename) {
-  std::vector<DBCMessage> dbcMessages;
+std::vector<DBCMessage *> SignalConfigParser::parseDBCFile(const char *dbcFilename) {
+  std::vector<DBCMessage *> dbcMessages;
   std::vector<DBCSignal> dbcSignals;
-  std::unordered_map<std::string, DBCSignal *> signalsByName;
 
   // Parse DBC JSON file
   JsonDocument dbcDoc = readJSONFile(dbcFilename);
   if (dbcDoc.isNull()) {
     Serial.println("Failed to parse DBC file");
-    return {dbcMessages, signalsByName};
+    return dbcMessages;
   }
 
   // Process DBC messages and signals
   JsonArray messages = dbcDoc["messages"];
+  if (messages.isNull() || messages.size() == 0) {
+    Serial.println("No messages found in DBC file!");
+    return dbcMessages;
+  }
+
   for (JsonObject msgJson : messages) {
     uint32_t id = msgJson["frame_id"];
     std::string name = msgJson["message_name"].as<const char *>();
     uint8_t dlc = msgJson["length"];
 
     // Create DBCMessage and store it
-    dbcMessages.emplace_back(id, name, dlc);
-    DBCMessage *message = &dbcMessages.back();
+    DBCMessage *message = new DBCMessage(id, name, dlc);
+    dbcMessages.push_back(message);
 
     // Process signals for this message
     JsonArray signalsJson = msgJson["signals"];
@@ -75,7 +78,11 @@ MessageConfigParser::parseDBCFile(const char *dbcFilename) {
       bool isBigEndian = sigJson["is_big_endian"];
 
       // Handle multiplexing
-      bool isMultiplexor = sigJson["is_multiplexer"] | false;
+      bool isMultiplexor = false;
+      // If is_multiplexer is true and multiplexer_signal is null, then this is a multiplexor
+      if (sigJson["is_multiplexer"] && sigJson["multiplexer_signal"] == nullptr) {
+        isMultiplexor = true;
+      }
 
       bool isMultiplexed = false;
       if (sigJson["multiplexer_signal"] != nullptr) {
@@ -88,22 +95,18 @@ MessageConfigParser::parseDBCFile(const char *dbcFilename) {
       }
 
       // Create DBCSignal and add to message
-      dbcSignals.emplace_back(sigName, startBit, length, scale, offset, isSigned, isBigEndian,
-                              isMultiplexor, isMultiplexed, multiplexValue);
-      DBCSignal *signal = &dbcSignals.back();
+      DBCSignal *signal = new DBCSignal(sigName, startBit, length, scale, offset, isSigned, isBigEndian,
+                                   isMultiplexor, isMultiplexed, multiplexValue);
       message->addSignal(signal);
-
-      // Store signal by name for quick lookup
-      signalsByName[sigName] = signal;
     }
   }
 
   Serial.println("Successfully parsed DBC file");
-  return {dbcMessages, signalsByName};
+  return dbcMessages;
 }
 
 std::vector<SignalConfig>
-MessageConfigParser::parseSignalConfigFile(const char *signalConfigFilename) {
+SignalConfigParser::parseSignalConfigFile(const char *signalConfigFilename) {
   std::vector<SignalConfig> signalConfigs;
 
   // Parse signal config JSON file
@@ -115,36 +118,37 @@ MessageConfigParser::parseSignalConfigFile(const char *signalConfigFilename) {
   // Process signal configurations
   JsonArray signalsJson = configDoc["signals"];
   for (JsonObject sigJson : signalsJson) {
-    SignalConfig sigConfig;
+    SignalConfig sigConfig = {};
     sigConfig.name = sigJson["name"].as<const char *>();
-    sigConfig.displayName = sigJson["displayName"] | sigConfig.name;
+    sigConfig.displayName = sigJson["displayName"].as<const char *>();
     sigConfig.log = sigJson["log"] | true;
     sigConfig.logRaw = sigJson["logRaw"] | false;
     sigConfig.transmit = sigJson["transmit"] | true;
 
-    signalConfigs.push_back(sigConfig);
+    signalConfigs.emplace_back(sigConfig);
   }
 
   Serial.println("Successfully parsed signal config file");
   return signalConfigs;
 }
 
-std::unordered_map<uint32_t, std::vector<Channel>> MessageConfigParser::buildChannelMap(
-    const std::vector<SignalConfig> &signalConfigs,
-    const std::unordered_map<std::string, DBCSignal *> &signalsByName,
-    std::vector<DBCMessage> &messages) {
-  std::unordered_map<uint32_t, std::vector<Channel>> channelMap;
+std::unordered_map<uint32_t, std::vector<Channel *>>
+SignalConfigParser::buildChannelMap(const std::vector<SignalConfig> &signalConfigs,
+                                    std::vector<DBCMessage *> &messages) {
+  std::unordered_map<uint32_t, std::vector<Channel *>> channelMap;
 
   // Create a map from signal to message for quicker lookups
-  std::unordered_map<DBCSignal *, const DBCMessage *> signalToMessage;
+  std::unordered_map<std::string, DBCMessage *> signalNameToMessage;
+  std::unordered_map<std::string, DBCSignal *> signalsByName;
   for (auto &message : messages) {
-    for (DBCSignal* signal : message.getSignals()) {
-      signalToMessage[signal] = &message;
+    for (auto &signal : message->getSignals()) {
+      signalNameToMessage[signal->getName()] = message;
+      signalsByName[signal->getName()] = signal;
     }
   }
 
   // Process each signal configuration
-  for (const auto &sigConfig : signalConfigs) {
+  for (const SignalConfig &sigConfig : signalConfigs) {
     // Find signal in DBC data
     auto sigIt = signalsByName.find(sigConfig.name);
     if (sigIt == signalsByName.end()) {
@@ -156,19 +160,19 @@ std::unordered_map<uint32_t, std::vector<Channel>> MessageConfigParser::buildCha
     DBCSignal *signal = sigIt->second;
 
     // Find which message this signal belongs to
-    auto msgIt = signalToMessage.find(signal);
-    if (msgIt == signalToMessage.end()) {
+    auto msgIt = signalNameToMessage.find(signal->getName());
+    if (msgIt == signalNameToMessage.end()) {
       Serial.print("Could not find message for signal: ");
       Serial.println(sigConfig.name.c_str());
       continue;
     }
 
-    const DBCMessage *message = msgIt->second;
+    DBCMessage *message = msgIt->second;
     uint32_t canId = message->getId();
 
     // Create channel and add to map
-    Channel channel(signal, message, sigConfig.displayName, sigConfig.log, sigConfig.logRaw,
-                    sigConfig.transmit);
+    Channel *channel = new Channel(signal, message, sigConfig.displayName, sigConfig.log,
+                            sigConfig.logRaw, sigConfig.transmit);
     channelMap[canId].push_back(channel);
   }
 

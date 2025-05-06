@@ -1,0 +1,185 @@
+{
+  "signals": [
+    {
+      "name": "RPM",
+      "displayName": "RPM",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "Coolant_Temperature",
+      "displayName": "Coolant Temp",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_0",
+      "displayName": "ADC Channel 0",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_1",
+      "displayName": "ADC Channel 1",
+      "log": true,
+      "transmit": true
+    },
+    {
+      
+      "name": "adc_channel_2",
+      "displayName": "ADC Channel 2",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_3",
+      "displayName": "ADC Channel 3",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_4",
+      "displayName": "ADC Channel 4",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_5",
+      "displayName": "ADC Channel 5",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_6",
+      "displayName": "ADC Channel 6",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "adc_channel_7",
+      "displayName": "ADC Channel 7",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_accel_x",
+      "displayName": "CG Accel X",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_accel_y",
+      "displayName": "CG Accel Y",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_accel_z",
+      "displayName": "CG Accel Z",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_gyro_x",
+      "displayName": "CG Gyro X",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_gyro_y",
+      "displayName": "CG Gyro Y",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_gyro_z",
+      "displayName": "CG Gyro Z",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_rot_i",
+      "displayName": "CG Rot I",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_rot_j",
+      "displayName": "CG Rot J",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_rot_k",
+      "displayName": "CG Rot K",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cg_imu_rot_r",
+      "displayName": "CG Rot R",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_1",
+      "displayName": "Current Sense 1",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_2",
+      "displayName": "Current Sense 2",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_3",
+      "displayName": "Current Sense 4",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_4",
+      "displayName": "Current Sense 4",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_5",
+      "displayName": "Current Sense 5",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_6",
+      "displayName": "Current Sense 6",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_7",
+      "displayName": "Current Sense 7",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_8",
+      "displayName": "Current Sense 8",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_9",
+      "displayName": "Current Sense 9",
+      "log": true,
+      "transmit": true
+    },
+    {
+      "name": "cur_sense_10",
+      "displayName": "Current Sense 10",
+      "log": true,
+      "transmit": true
+    }
+  ]
+}

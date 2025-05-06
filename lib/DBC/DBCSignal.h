@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <math.h>
 
 class DBCSignal {
 public:

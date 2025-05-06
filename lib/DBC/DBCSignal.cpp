@@ -8,48 +8,85 @@ DBCSignal::DBCSignal(const std::string &name, uint8_t startBit, uint8_t length, 
       isMultiplexed(isMultiplexed), multiplexValue(multiplexValue) {}
 
 /**
- * Process a message and extract the signal value.
+ * Correctly process a message using the DBC bit numbering convention.
  * @param data The raw message data
  */
 void DBCSignal::processMessage(const uint8_t *data) {
   uint64_t rawValue = 0;
-  int bitPos = startBit;
 
   if (isBigEndian) {
-    // Motorola format (Big Endian)
-    for (int i = 0; i < length; i++) {
-      int byteIndex = 7 - (bitPos / 8);
-      int bitIndex = bitPos % 8;
+    // For big-endian (Motorola) signals with DBC bit numbering
 
-      if (data[byteIndex] & (1 << bitIndex)) {
-        rawValue |= (uint64_t)1 << i;
+    // Find the start byte and bit position
+    uint8_t startByte = startBit / 8;
+    uint8_t bitPosition = startBit % 8;
+
+    // Calculate bit positions
+    uint8_t currentByte = startByte;
+    uint8_t currentBit = bitPosition;
+    uint8_t bitsRemaining = length;
+
+    while (bitsRemaining > 0) {
+      // Process bits from MSB to LSB order (left to right in each byte)
+      // How many bits can we read from current byte
+      uint8_t bitsToRead = 1;
+
+      // Extract bits from current byte
+      uint8_t extractedBits = (data[currentByte] & 0x01) >> currentBit;
+
+      // Extract the current bit
+      uint8_t bitValue = (data[currentByte] >> currentBit) & 0x01;
+
+      // Add this bit to our result (shifting left for big-endian order)
+      rawValue = (rawValue << 1) | bitValue;
+
+      bitsRemaining--;
+
+      // Move to next bit (going left to right within byte)
+      if (currentBit == 0) {
+        // We've reached the end of this byte, go to next byte
+        currentByte++;
+        currentBit = 7; // Start at MSB of next byte
+      } else {
+        // Move to next bit position to the right
+        currentBit--;
       }
-
-      bitPos--;
-      if (bitPos < 0)
-        bitPos = 63; // wrap around
     }
   } else {
-    // Intel format (Little Endian)
-    for (int i = 0; i < length; i++) {
-      int byteIndex = bitPos / 8;
-      int bitIndex = bitPos % 8;
+    // Find start byte and bit position
+    uint8_t startByte = startBit / 8;
+    uint8_t bitPosition = startBit % 8;
+    uint8_t bitsRemaining = length;
+    uint8_t bitShift = 0; // Track position in result
 
-      if (data[byteIndex] & (1 << bitIndex)) {
-        rawValue |= (uint64_t)1 << i;
+    // Process bytes from start position
+    while (bitsRemaining > 0) {
+      // How many bits we can read from current byte
+      uint8_t bitsToRead = 8 - bitPosition;
+      if (bitsToRead > bitsRemaining) {
+        bitsToRead = bitsRemaining;
       }
 
-      bitPos++;
+      // Create mask for the bits we want
+      uint8_t mask = ((1 << bitsToRead) - 1) << bitPosition;
+
+      // Extract bits from current byte and add to result
+      uint8_t extractedBits = (data[startByte] & mask) >> bitPosition;
+      rawValue |= (uint64_t)extractedBits << bitShift;
+
+      // Update counters
+      bitsRemaining -= bitsToRead;
+      bitShift += bitsToRead;
+      startByte++;     // Move to next byte
+      bitPosition = 0; // Start from bit 0 in next byte
     }
   }
 
-  // Convert raw value to signed if necessary
+  // Process signed values if needed
   if (isSigned) {
-    // Handle sign extension
-    int signBit = 1 << (length - 1);
+    uint64_t signBit = 1ULL << (length - 1);
     if (rawValue & signBit) {
-      // Negative value, extend sign bit
-      uint64_t mask = 0xFFFFFFFFFFFFFFFFULL << length;
+      uint64_t mask = ~((1ULL << length) - 1);
       rawValue |= mask;
     }
     value = static_cast<double>(static_cast<int64_t>(rawValue));
@@ -79,13 +116,8 @@ double DBCSignal::getValue() const { return value; }
  * @return True if the multiplexor signal is active for the given multiplexor value, false otherwise
  */
 bool DBCSignal::isActive(uint8_t currentMultiplexValue) const {
-  // If this is the multiplexor signal, it's always active
-  if (isMultiplexor) {
-    return true;
-  }
-
-  // If this signal is not multiplexed, it's always active
-  if (!isMultiplexed) {
+  // If this is the multiplexor signal or is not multiplexed, it's always active
+  if (isMultiplexor || !isMultiplexed) {
     return true;
   }
 

@@ -6,28 +6,26 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <list>
 
 class ChannelManager {
 public:
-  void addChannel(Channel &channel);
+  void addChannel(Channel *channel);
 
   void processCANMessage(uint32_t id, const uint8_t *data);
 
-  const std::vector<Channel> getChannelsForId(uint32_t id) const;
+  const std::vector<Channel *> getChannelsForId(uint32_t id) const;
 
-  std::vector<Channel> getLoggableChannels();
+  std::vector<Channel *> getLoggableChannels();
 
-  std::vector<Channel> getRadioTransmitChannels();
+  std::vector<Channel *> getRadioTransmitChannels();
 
   Channel *findChannelByName(const std::string &name);
 
 private:
-  std::unordered_map<uint32_t, std::vector<Channel>> channelMap;
+  std::unordered_map<uint32_t, std::vector<Channel *>> channelMap;
 
-  std::unordered_map<std::string, Channel*> channelsByName;
-
-  // Static empty vector to return when no channels are found
-  const std::vector<Channel> emptyVector;
+  std::unordered_map<std::string, Channel *> channelsByName;
 };
 
 #endif
