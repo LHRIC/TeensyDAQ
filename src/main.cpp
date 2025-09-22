@@ -1,32 +1,38 @@
 #include <Arduino.h>
-#include <TeensyThreads.h>
 #include <FlexCAN_T4.h>
+#include <TeensyThreads.h>
 #include <ctime>
-#include <unordered_map>
+#include <stdint.h>
 
-#include <ArduinoJson-v6.21.2.h>
+#include <ArduinoJson.h>
 #include <EEPROM.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 
-#include <Channel.h>
+#include <ChannelManager.h>
+#include <DBCMessage.h>
+#include <DBCSignal.h>
 #include <Logger.h>
 #include <RPC.h>
+#include <SignalConfig.h>
 
 #define LED_PIN 13
-#define DATALOG_PIN 40
+#define DATALOG_PIN 2
 
 #define SERIAL_USB_BAUDRATE 115200
 #define SERIAL_XBEE_BAUDRATE 115200
 #define GPS_INITIALIZE_TIMEOUT_MS 5000
 #define GPS_I2C_CLOCK 400E3
 
+#define DBC_FILEPATH "/LHRDB.json"
+#define SIGNAL_CONFIG_FILEPATH "/SignalConfig.json"
+
 ThreadWrap(Serial, serialUsbThreadSafe)
 #define SERIAL_USB ThreadClone(serialUsbThreadSafe)
 
-ThreadWrap(Serial2, serialXbeeThreadSafe)
+    ThreadWrap(Serial1, serialXbeeThreadSafe)
 #define SERIAL_XBEE ThreadClone(serialXbeeThreadSafe)
 
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0; // testing new comments
+        FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_256> Can0;
 
 SFE_UBLOX_GNSS gnssModule;
 uint32_t epoch;
@@ -35,89 +41,11 @@ int32_t lat;
 int32_t lon;
 int32_t alt;
 
-DynamicJsonDocument doc(2048);
+JsonDocument doc;
 
 Logger sdCard;
 
 RadioReceiver xBee = RadioReceiver();
-
-// ECU channels
-Channel rpm_c = Channel(0x360, 50, 0, 1, 1, 0, "rpm", false, false);
-Channel map_c = Channel(0x360, 50, 2, 3, 10, 0, "map", false, false);
-Channel tps_c = Channel(0x360, 50, 4, 5, 10, 0, "tps", false, false);
-Channel coolant_temp_c = Channel(0x3E0, 5, 0, 1, 10, -273.15, "coolant_temp", false, false);
-Channel batt_voltage_c = Channel(0x372, 10, 0, 1, 10, 0, "batt_voltage", false, false);
-Channel apps_c = Channel(0x471, 50, 2, 3, 10, 0, "apps", false, false);
-Channel o2_c = Channel(0x368, 20, 0, 1, 1000, 0, "lambda", false, false);
-Channel oil_pa_c = Channel(0x361, 50, 2, 3, 10, -101.3, "oil_pa", false, false);
-Channel gear = Channel(0x470, 20, 7, 7, 1, 0, "gear", false, false);
-
-// CAN board channels
-
-// CG
-Channel cg_accel_x = Channel(0x400, 60, 0, 1, 256.0, 0, "cg_accel_x", true, true);
-Channel cg_accel_y = Channel(0x400, 60, 2, 3, 256.0, 0, "cg_accel_y", true, true);
-Channel cg_accel_z = Channel(0x400, 60, 4, 5, 256.0, 0, "cg_accel_z", true, true);
-Channel cg_gyro_x = Channel(0x406, 60, 0, 1, 256.0, 0, "cg_gyro_x", true, true);
-Channel cg_gyro_y = Channel(0x406, 60, 2, 3, 256.0, 0, "cg_gyro_y", true, true);
-Channel cg_gyro_z = Channel(0x406, 60, 4, 5, 256.0, 0, "cg_gyro_z", true, true);
-Channel cg_lin_accel_x = Channel(0x407, 60, 0, 1, 256.0, 0, "cg_lin_accel_x", true, true);
-Channel cg_lin_accel_y = Channel(0x407, 60, 2, 3, 256.0, 0, "cg_lin_accel_y", true, true);
-Channel cg_lin_accel_z = Channel(0x407, 60, 4, 5, 256.0, 0, "cg_lin_accel_z", true, true);
-Channel cg_rot_i = Channel(0x408, 60, 0, 1, 256.0, 0, "cg_rot_i", true, true);
-Channel cg_rot_j = Channel(0x408, 60, 2, 3, 256.0, 0, "cg_rot_j", true, true);
-Channel cg_rot_k = Channel(0x408, 60, 4, 5, 256.0, 0, "cg_rot_k", true, true);
-Channel cg_rot_real = Channel(0x408, 60, 6, 7, 256.0, 0, "cg_rot_real", true, true);
-
-// ADC
-Channel fl_adc1 = Channel(0x404, 100, 0, 1, 1, 0, "fl_adc1", false, false);
-Channel fl_adc2 = Channel(0x404, 100, 2, 3, 1, 0, "fl_adc2", false, false);
-Channel fl_adc3 = Channel(0x404, 100, 4, 5, 1, 0, "fl_adc3", false, false);
-Channel fl_adc4 = Channel(0x404, 100, 6, 7, 1, 0, "fl_adc4", false, false);
-Channel fr_adc1 = Channel(0x401, 100, 0, 1, 1, 0, "fr_adc1", false, false);
-Channel fr_adc2 = Channel(0x401, 100, 2, 3, 1, 0, "fr_adc2", false, false);
-Channel fr_adc3 = Channel(0x401, 100, 4, 5, 1, 0, "fr_adc3", false, false);
-Channel fr_adc4 = Channel(0x401, 100, 6, 7, 1, 0, "fr_adc4", false, false);
-Channel rr_adc1 = Channel(0x402, 100, 0, 1, 1, 0, "rr_adc1", false, false);
-Channel rr_adc2 = Channel(0x402, 100, 2, 3, 1, 0, "rr_adc2", false, false);
-Channel rr_adc3 = Channel(0x402, 100, 4, 5, 1, 0, "rr_adc3", false, false);
-Channel rr_adc4 = Channel(0x402, 100, 6, 7, 1, 0, "rr_adc4", false, false);
-
-std::unordered_multimap<uint16_t, Channel> channelMap = {
-    {rpm_c.getChannelId(), rpm_c},
-    {map_c.getChannelId(), map_c},
-    {tps_c.getChannelId(), tps_c},
-    {coolant_temp_c.getChannelId(), coolant_temp_c},
-    {batt_voltage_c.getChannelId(), batt_voltage_c},
-    {apps_c.getChannelId(), apps_c},
-    {o2_c.getChannelId(), o2_c},
-    {gear.getChannelId(), gear},
-    {oil_pa_c.getChannelId(), oil_pa_c},
-    {cg_accel_x.getChannelId(), cg_accel_x},
-    {cg_accel_y.getChannelId(), cg_accel_y},
-    {cg_accel_z.getChannelId(), cg_accel_z},
-    {cg_gyro_x.getChannelId(), cg_gyro_x},
-    {cg_gyro_y.getChannelId(), cg_gyro_y},
-    {cg_gyro_z.getChannelId(), cg_gyro_z},
-    {cg_lin_accel_x.getChannelId(), cg_lin_accel_x},
-    {cg_lin_accel_y.getChannelId(), cg_lin_accel_y},
-    {cg_lin_accel_z.getChannelId(), cg_lin_accel_z},
-    {cg_rot_i.getChannelId(), cg_rot_i},
-    {cg_rot_j.getChannelId(), cg_rot_j},
-    {cg_rot_k.getChannelId(), cg_rot_k},
-    {cg_rot_real.getChannelId(), cg_rot_real},
-    {fr_adc1.getChannelId(), fr_adc1},
-    {fr_adc2.getChannelId(), fr_adc2},
-    {fr_adc3.getChannelId(), fr_adc3},
-    {fr_adc4.getChannelId(), fr_adc4},
-    {rr_adc1.getChannelId(), rr_adc1},
-    {rr_adc2.getChannelId(), rr_adc2},
-    {rr_adc3.getChannelId(), rr_adc3},
-    {rr_adc4.getChannelId(), rr_adc4},
-    {fl_adc1.getChannelId(), fl_adc1},
-    {fl_adc2.getChannelId(), fl_adc2},
-    {fl_adc3.getChannelId(), fl_adc3},
-    {fl_adc4.getChannelId(), fl_adc4}};
 
 volatile uint8_t lastDatalogSwitchState = 1;
 volatile uint8_t datalogSwitchState = 1;
@@ -129,22 +57,53 @@ volatile bool isLogging = false;
 String filename;
 volatile int32_t unixEpoch;
 
+ChannelManager channelManager;
+
 // Thread Co-routines
 void transmitCANData() {
-  while (1) {
-    for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
-      Channel curChannel = it->second;
-      std::string name = ">" + curChannel.getName() + ":";
+  JsonDocument transmitDoc;
 
-      SERIAL_XBEE.print(name.c_str());
-      SERIAL_XBEE.println(curChannel.getScaledValue());
+  while (1) {
+    // Get all transmitting channels
+    std::vector<Channel *> radioTransmitChannels = channelManager.getRadioTransmitChannels();
+
+    for (auto &curChannel : radioTransmitChannels) {
+      // std::string name = ">" + curChannel->getName() + ":";
+
+      // SERIAL_XBEE.print(name.c_str());
+      // SERIAL_XBEE.println(curChannel->getScaledValue());
+
+      // // Send raw data if enabled
+      // if (curChannel->isRawLoggingEnabled()) {
+      //   std::string rawName = ">" + curChannel->getName() + "_raw:";
+      //   SERIAL_XBEE.print(rawName.c_str());
+      //   SERIAL_XBEE.println(curChannel->getRawValue());
+      // }
+
+      // Add to JSON document
+      std::string name = curChannel->getName();
+      double value = curChannel->getScaledValue();
+      double rawValue = curChannel->getRawValue();
+
+      transmitDoc[name.c_str()] = value;
+
+      // Log raw data if enabled
+      if (curChannel->isRawLoggingEnabled()) {
+        std::string rawName = name + "_raw";
+        transmitDoc[rawName.c_str()] = rawValue;
+      }
     }
 
-    // Send GPS separately since it's not a CAN channel
-    SERIAL_XBEE.print(">lat:");
-    SERIAL_XBEE.println((float)doc["lat"]);
-    SERIAL_XBEE.print(">long:");
-    SERIAL_XBEE.println((float)doc["lon"]);
+    // Add GPS data to JSON document
+    transmitDoc["lat"] = lat;
+    transmitDoc["lon"] = lon;
+    transmitDoc["alt"] = alt;
+    transmitDoc["epoch"] = epoch;
+    transmitDoc["nanos"] = nanos;
+
+    // Serialize and send the JSON document
+    serializeJson(transmitDoc, SERIAL_XBEE);
+    SERIAL_XBEE.println();
 
     // Yield to next thread
     threads.yield();
@@ -154,9 +113,11 @@ void transmitCANData() {
 void writeSDCardData() {
   uint8_t ledState = HIGH;
   while (1) {
-    if(isLogging) {
+    if (isLogging) {
+      // Pulse LED to indicate logging
       digitalWrite(LED_PIN, ledState);
       ledState = !ledState;
+
       char output[1024] = {0};
 
       serializeJson(doc, output);
@@ -171,11 +132,11 @@ void writeSDCardData() {
 }
 
 void handleRXing() {
-  while(1) {
-    if(SERIAL_XBEE.available()) {
+  while (1) {
+    if (SERIAL_XBEE.available()) {
       char rxByte = SERIAL_XBEE.read();
 
-      if(rxByte != -1){
+      if (rxByte != -1) {
         xBee.parseFrame(rxByte);
       } else {
         threads.yield();
@@ -187,40 +148,33 @@ void handleRXing() {
 }
 
 void monitorDatalogSwitch() {
-  while(1) {
-    datalogSwitchState = digitalRead(DATALOG_PIN);
-    
-    if(datalogSwitchState == 0 && lastDatalogSwitchState == 1) {
-      datalogFallingEdgeDetected = true;
-      datalogRisingEdgeDetected = false;
-      // Start datalogging
-      if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
-        // Failed GPS Init in time
-        filename = "log_millis_" + String(millis()) + ".txt";
-      } else {
-        // Get the current time in Unix Epoch format
-        unixEpoch = gnssModule.getUnixEpoch();
-        filename = "log_epoch_" + String(unixEpoch) + ".txt";
-      }
+  // Switch is pulled high, so we need to check for falling edge
+  // to detect when the switch is pressed
 
-      sdCard.setFilename((char *)filename.c_str());
-      SERIAL_USB.print("Starting log:");
-      SERIAL_USB.println(filename);
-      sdCard.startLogging();
-      isLogging = true;
-    } else if (datalogSwitchState == 1 && lastDatalogSwitchState == 0) {
-      datalogFallingEdgeDetected = false;
-      datalogRisingEdgeDetected = true;
-      SERIAL_USB.println("Stopping logger");
-      // Stop datalogging
-      sdCard.stopLogging();
-      isLogging = false;
+  // 1 = Rising edge, 0 = Falling edge
+  datalogSwitchState = digitalRead(DATALOG_PIN);
+
+  if (datalogSwitchState == 0 && isLogging == false) {
+    // Start datalogging
+    if (!gnssModule.getDateValid() || !gnssModule.getTimeValid()) {
+      // Failed GPS Init in time
+      filename = "log_millis_" + String(millis()) + ".txt";
     } else {
-      datalogFallingEdgeDetected = false;
-      datalogRisingEdgeDetected = false;
+      // Get the current time in Unix Epoch format
+      unixEpoch = gnssModule.getUnixEpoch();
+      filename = "log_epoch_" + String(unixEpoch) + ".txt";
     }
-    lastDatalogSwitchState = datalogSwitchState;    
-    threads.delay(100);
+
+    sdCard.setFilename((char *)filename.c_str());
+    SERIAL_USB.print("Starting log:");
+    SERIAL_USB.println(filename);
+    sdCard.startLogging();
+    isLogging = true;
+  } else if (datalogSwitchState == 1 && isLogging == true) {
+    SERIAL_USB.println("Stopping logger");
+    // Stop datalogging
+    sdCard.stopLogging();
+    isLogging = false;
   }
 }
 
@@ -249,23 +203,33 @@ void gpsPVTCallback(UBX_NAV_PVT_data_t *ubxDataStruct) {
 }
 
 void onCANMessageCallback(const CAN_message_t &msg) {
-  // Find the channel that matches the incoming message.
-  auto range = channelMap.equal_range(msg.id);
-  for (auto it = range.first; it != range.second; ++it) {
-    Channel &curChannel = it->second;
-    if (curChannel.getName().empty()) {
-      continue;
-    }
+  // Process the CAN message
+  channelManager.processCANMessage(msg.id, msg.buf);
 
-    curChannel.setValue(msg.buf);
-    curChannel.setScaledValue();
-    doc[curChannel.getName()] = curChannel.getValue();
+  // Log signals in the message
+  if (isLogging) {
+    std::vector<Channel *> channels = channelManager.getChannelsForId(msg.id);
+
+    for (auto &curChannel : channels) {
+      std::string name = curChannel->getName();
+      double value = curChannel->getScaledValue();
+      double rawValue = curChannel->getRawValue();
+  
+      doc[name.c_str()] = value;
+  
+      // Log raw data if enabled
+      if (curChannel->isRawLoggingEnabled()) {
+        std::string rawName = name + "_raw";
+        doc[rawName.c_str()] = rawValue;
+      }
+    }
   }
 }
 
 // Initial Setup
 void setupGPS() {
-  while (gnssModule.begin() == false) {
+  int startTime = millis();
+  while (gnssModule.begin() == false && (millis() - startTime) < GPS_INITIALIZE_TIMEOUT_MS) {
     SERIAL_USB.println(F("u-blox GNSS not detected at default I2C address. Retrying..."));
     delay(1000);
   }
@@ -304,6 +268,12 @@ void waitForGPSFix(uint32_t msTimeout) {
     SERIAL_USB.println("Waiting for GPS fix...");
     delay(500);
   }
+
+  if (gnssModule.getTimeValid() && gnssModule.getDateValid()) {
+    SERIAL_USB.println("GPS fix acquired!");
+  } else {
+    SERIAL_USB.println("Failed to acquire GPS fix");
+  }
 }
 
 void setupCANBus() {
@@ -315,7 +285,7 @@ void setupCANBus() {
   Can0.enableFIFOInterrupt();
   Can0.onReceive(onCANMessageCallback);
 
-  //Can0.mailboxStatus();
+  // Can0.mailboxStatus();
 }
 
 void setupSDCard() {
@@ -327,10 +297,26 @@ void setupSDCard() {
   }
 }
 
+void setupChannels() {
+  // Load channel map from JSON files
+  std::unordered_map<uint32_t, std::vector<Channel *>> channelMap =
+      SignalConfigParser::getChannelMap(SIGNAL_CONFIG_FILEPATH, DBC_FILEPATH);
+
+  // Add channels to the channel manager
+  Serial.println("Adding following channels to channel manager");
+  for (auto it = channelMap.begin(); it != channelMap.end(); it++) {
+    for (Channel *curChannel : it->second) {
+      Serial.println(curChannel->getName().c_str());
+      channelManager.addChannel(curChannel);
+    }
+  }
+}
+
 void setup(void) {
   // Setup GPIO
   pinMode(LED_PIN, OUTPUT);
-  pinMode(DATALOG_PIN, INPUT);
+  pinMode(DATALOG_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(DATALOG_PIN), monitorDatalogSwitch, CHANGE);
   digitalWrite(LED_PIN, HIGH);
 
   // UART Channel Setup
@@ -341,6 +327,10 @@ void setup(void) {
   Wire.begin();
   Wire.setClock(GPS_I2C_CLOCK);
 
+  // Setup Channels
+  setupChannels();
+
+  // Initialize GPS module
   setupGPS();
   waitForGPSFix(GPS_INITIALIZE_TIMEOUT_MS);
 
@@ -349,19 +339,15 @@ void setup(void) {
   setupCANBus();
 
   // Dispatch threads
-  //threads.addThread(handleRXing);
-  
+  // threads.addThread(handleRXing);
   threads.addThread(transmitCANData);
-  threads.addThread(monitorDatalogSwitch);
-  
-  // Allocate 4MB of stack memory for this thread.
-  // Any less and you risk causing a stack overflow, 
+
+  // Allocate 4KB of stack memory for this thread.
+  // Any less and you risk causing a stack overflow,
   // which will cause the Teensy to hard fault.
   //
   // Don't ask me how I know...
   threads.addThread(writeSDCardData, 0, 4096);
-
-  threads.addThread(handleRXing);
 
   digitalWrite(LED_PIN, LOW);
 }

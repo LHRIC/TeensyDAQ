@@ -1,42 +1,37 @@
-#include <Arduino.h>
-#include <string>
-
 #ifndef SRC_CHANNEL_H_
 #define SRC_CHANNEL_H_
 
+#include "DBCMessage.h"
+#include "DBCSignal.h"
+#include <stdint.h>
+#include <string>
+
 class Channel {
-    public:
-        Channel();
-        Channel(uint16_t ChannelId, uint16_t SampleRate, uint8_t StartBit, uint8_t EndBit, 
-                double DivisorScalar, double AdditiveScalar, std::string Name, bool IsSigned, bool littleEndian);
-        
-        uint16_t getValue();
-        int16_t getSignedValue();
-        void setValue(const uint8_t* buf);
+public:
+  Channel(DBCSignal *signal, DBCMessage *message, const std::string displayName,
+          bool log = true, bool logRaw = false, bool radioTransmit = false);
 
-        double getScaledValue();
-        void setScaledValue(double value);
-        void setScaledValue();
+  void processMessage(const uint8_t *data);
+  double getScaledValue() const { return signal->getScaledValue(); }
+  double getRawValue() const { return signal->getValue(); }
+  const std::string &getName() const { return displayName; }
 
-        uint16_t getChannelId();
-        std::string getName();
-        bool getIsSigned();
+  bool isLoggingEnabled() const { return logEnabled; }
+  bool isRawLoggingEnabled() const { return logRawEnabled; }
+  bool isRadioTransmitEnabled() const { return radioTransmitEnabled; }
 
-    private:
-        uint16_t channelId;
-        uint16_t sampleRate;
-        uint8_t startBit;
-        uint8_t endBit;
-        uint8_t numBytes;
-        std::string name;
-        bool isSigned;
-        bool littleEndian;
+  bool isActiveForMultiplexValue(uint8_t multiplexValue) const;
 
-        double divisorScalar;
-        double additiveScalar;
+  const DBCSignal *getSignal() const { return signal; }
+  const DBCMessage *getMessage() const { return message; }
 
-        uint16_t value;
-        double scaledValue;
-
+private:
+  DBCSignal *signal;
+  DBCMessage *message;
+  std::string displayName;
+  bool logEnabled;
+  bool logRawEnabled;
+  bool radioTransmitEnabled;
 };
+
 #endif

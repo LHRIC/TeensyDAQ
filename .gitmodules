@@ -1,6 +1,3 @@
-[submodule "EmbeddedProto"]
-	path = EmbeddedProto
-	url = https://github.com/Embedded-AMS/EmbeddedProto.git
 [submodule "lib/SparkFun_u-blox_GNSS_v3"]
 	path = lib/SparkFun_u-blox_GNSS_v3
 	url = git@github.com:sparkfun/SparkFun_u-blox_GNSS_v3.git
@@ -10,3 +7,6 @@
 [submodule "lib/SdFat"]
 	path = lib/SdFat
 	url = git@github.com:greiman/SdFat.git
+[submodule "lib/ArduinoJson"]
+	path = lib/ArduinoJson
+	url = git@github.com:bblanchon/ArduinoJson.git

@@ -1,7 +1,0 @@
-[
-{
-  "directory": "C:/Users/Samrut Gadde/Documents/TeensyDAQ/build",
-  "command": "C:\\MinGW\\bin\\gcc.exe  @CMakeFiles/unity.dir/includes_C.rsp -g -Waddress -Waggregate-return -Wformat-nonliteral -Wformat-security -Wformat -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wno-multichar -Wno-parentheses -Wno-type-limits -Wno-unused-parameter -Wunreachable-code -Wwrite-strings -Wpointer-arith -Werror -Wall -std=c11 -o CMakeFiles\\unity.dir\\src\\unity.c.obj -c \"C:\\Users\\Samrut Gadde\\Documents\\TeensyDAQ\\.pio\\libdeps\\teensy41\\Unity\\src\\unity.c\"",
-  "file": "C:/Users/Samrut Gadde/Documents/TeensyDAQ/.pio/libdeps/teensy41/Unity/src/unity.c"
-}
-]
